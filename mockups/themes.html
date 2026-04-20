@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — theme directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Space+Grotesk:wght@500;700&family=Fraunces:ital,wght@0,500;0,700;0,900;1,500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #080808; color: #eee;
+    font-family: -apple-system, Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══════ Page shell ═══════ */
+  .shell {
+    padding: 32px 28px 60px; max-width: 1600px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; color: #fff; }
+  .lede {
+    color: #999; font-size: 14px; margin-top: 6px; max-width: 780px; line-height: 1.5;
+  }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px; margin-top: 24px;
+  }
+  .wrap { display: flex; flex-direction: column; }
+  .wrap-hdr {
+    background: #161616; border-radius: 18px 18px 0 0; padding: 16px;
+    border: 1px solid #222; border-bottom: 0;
+  }
+  .idx { font-size: 11px; letter-spacing: 2px; color: #777; font-weight: 700; }
+  .wrap-title { font-size: 17px; font-weight: 800; margin-top: 4px; color: #fff; }
+  .wrap-sub { font-size: 12px; color: #999; margin-top: 2px; }
+  .wrap-cap {
+    background: #161616; border-radius: 0 0 18px 18px; padding: 12px 16px 14px;
+    font-size: 12px; color: #bbb; line-height: 1.5;
+    border: 1px solid #222; border-top: 0;
+  }
+  .wrap-cap b { color: #fff; font-weight: 700; }
+
+  /* ═══════ Shared mockup structure — themed by CSS vars ═══════ */
+  .phone {
+    background: var(--bg);
+    padding: 12px 12px 0;
+    border-left: 1px solid #222; border-right: 1px solid #222;
+    font-family: var(--font-body);
+    color: var(--text);
+    overflow: hidden;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .elapsed { font-size: 16px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--text); font-family: var(--font-display); }
+  .topbar .progress { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .5px; }
+  .stack { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 12px; }
+
+  /* Exercise cards */
+  .ex {
+    border-radius: var(--radius);
+    padding: 12px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+  }
+  .ex.done {
+    background: var(--done-bg);
+    border-color: var(--done-border);
+  }
+  .ex.active {
+    background: var(--active-bg);
+    border-color: var(--active-border);
+  }
+  .ex.pending { opacity: .55; }
+
+  .ex-hdr {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  }
+  .ex-title-wrap { flex: 1; min-width: 0; }
+  .ex-name {
+    font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-display);
+    text-transform: var(--name-case);
+    letter-spacing: var(--name-spacing);
+  }
+  .ex-name .check {
+    font-size: 13px; font-weight: 900;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: var(--check-radius);
+    background: var(--ok-tint); color: var(--ok);
+  }
+  .ex-name .dot-active {
+    width: 7px; height: 7px; border-radius: 4px; background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .ex-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .pill {
+    padding: 3px 8px; border-radius: var(--pill-radius);
+    font-size: 10px; font-weight: 800; letter-spacing: .5px;
+    background: var(--pill-bg); color: var(--pill-fg);
+    white-space: nowrap; font-family: var(--font-mono);
+  }
+  .pill.done { background: var(--ok-tint); color: var(--ok); }
+  .pill.pending { background: var(--surface2); color: var(--muted); }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: var(--ok-tint); color: var(--ok); font-family: var(--font-mono);
+  }
+
+  .coach {
+    border-left: 3px solid var(--accent);
+    padding: 4px 8px; margin-top: 8px;
+    font-size: 11px; color: var(--accent); font-weight: 700;
+    font-family: var(--font-display);
+  }
+
+  /* Set rows */
+  .set {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 48px;
+    gap: 6px; align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .set:last-child { border-bottom: 0; }
+  .set-n {
+    font-size: 10px; font-weight: 800; color: var(--muted);
+    letter-spacing: 1.5px; font-family: var(--font-mono);
+  }
+  .set.current .set-n { color: var(--accent); }
+  .set.logged .set-n { color: var(--ok); }
+  .divider { height: 1px; background: var(--divider); margin: 8px 0 6px; }
+
+  /* Stepper */
+  .stp {
+    display: flex; align-items: center;
+    background: var(--surface2); border-radius: var(--input-radius); overflow: hidden;
+    height: 34px; flex: 1; min-width: 0;
+  }
+  .stp .b {
+    width: 30px; text-align: center; color: var(--text);
+    font-weight: 800; font-size: 15px;
+    line-height: 34px;
+  }
+  .stp .v {
+    flex: 1; text-align: center; color: var(--text);
+    font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;
+    padding: 0 2px;
+  }
+  .stp .v.ph { color: var(--mutedX); font-weight: 700; }
+  .stp.tint-ok   { background: var(--ok-tint); }
+  .stp.tint-push { background: var(--accent-tint); }
+  .stp.tint-red  { background: var(--danger-tint); }
+  .stp.locked    { opacity: .75; }
+  .stp.locked .b { visibility: hidden; }
+
+  .log {
+    width: 48px; height: 34px; border-radius: var(--input-radius);
+    background: var(--accent); color: var(--log-fg);
+    font-weight: 900; font-size: 11px;
+    letter-spacing: 1; display: flex; justify-content: center; align-items: center;
+    font-family: var(--font-mono);
+  }
+  .log.del { background: var(--danger-tint); color: var(--danger); font-size: 16px; }
+  .log.disabled { background: var(--surface2); color: var(--mutedX); }
+
+  /* ═══════ THEME 1 — "Brutalist Lime" ═══════ */
+  .t1 {
+    --bg: #000;
+    --surface: #0A0A0A;
+    --surface2: #141414;
+    --border: #2a2a2a;
+    --divider: #1a1a1a;
+    --text: #ffffff;
+    --muted: #888;
+    --mutedX: #555;
+
+    --accent: #CCFF00;
+    --accent-glow: rgba(204,255,0,.3);
+    --accent-tint: rgba(204,255,0,.16);
+
+    --ok: #CCFF00;
+    --ok-tint: rgba(204,255,0,.14);
+
+    --danger: #FF2E2E;
+    --danger-tint: rgba(255,46,46,.20);
+
+    --radius: 0;
+    --pill-radius: 0;
+    --input-radius: 0;
+    --check-radius: 0;
+
+    --font-display: "Space Grotesk", Inter, sans-serif;
+    --font-body: Inter, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    --active-bg: #0F0F0F;
+    --active-border: #CCFF00;
+    --done-bg: rgba(204,255,0,.04);
+    --done-border: rgba(204,255,0,.35);
+
+    --log-fg: #000;
+
+    --pill-bg: #CCFF00;
+    --pill-fg: #000;
+
+    --name-case: uppercase;
+    --name-spacing: 1px;
+  }
+
+  /* ═══════ THEME 2 — "Editorial Paper" (LIGHT) ═══════ */
+  .t2 {
+    --bg: #F7F3EA;
+    --surface: #FFFFFF;
+    --surface2: #EFE9DC;
+    --border: #D8D1BF;
+    --divider: rgba(0,0,0,.06);
+    --text: #1A1A1A;
+    --muted: #7A7362;
+    --mutedX: #A59D89;
+
+    --accent: #B8443A;
+    --accent-glow: rgba(184,68,58,.18);
+    --accent-tint: rgba(184,68,58,.10);
+
+    --ok: #4A6B2F;
+    --ok-tint: rgba(74,107,47,.10);
+
+    --danger: #A1261F;
+    --danger-tint: rgba(161,38,31,.14);
+
+    --radius: 4px;
+    --pill-radius: 3px;
+    --input-radius: 4px;
+    --check-radius: 10px;
+
+    --font-display: Fraunces, Georgia, serif;
+    --font-body: Inter, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    --active-bg: #FFF9EE;
+    --active-border: #C2956D;
+    --done-bg: #F1EDD8;
+    --done-border: #D6C99D;
+
+    --log-fg: #FFFFFF;
+
+    --pill-bg: rgba(184,68,58,.12);
+    --pill-fg: #B8443A;
+
+    --name-case: none;
+    --name-spacing: 0;
+  }
+
+  /* ═══════ THEME 3 — "Synthwave Neon" ═══════ */
+  .t3 {
+    --bg: #0A0520;
+    --surface: linear-gradient(180deg, #1C0A4A, #13083A);
+    --surface2: #1D0F46;
+    --border: #2D1960;
+    --divider: rgba(255,46,176,.08);
+    --text: #F0EFFF;
+    --muted: #9B8FD9;
+    --mutedX: #6E619E;
+
+    --accent: #FF2EB0;
+    --accent-glow: rgba(255,46,176,.4);
+    --accent-tint: rgba(0,240,255,.14);
+
+    --ok: #00F0FF;
+    --ok-tint: rgba(0,240,255,.14);
+
+    --danger: #FF5F6B;
+    --danger-tint: rgba(255,95,107,.18);
+
+    --radius: 12px;
+    --pill-radius: 10px;
+    --input-radius: 10px;
+    --check-radius: 10px;
+
+    --font-display: "Space Grotesk", Inter, sans-serif;
+    --font-body: Inter, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    --active-bg: linear-gradient(180deg, rgba(255,46,176,.10), rgba(28,10,74,.8));
+    --active-border: rgba(255,46,176,.55);
+    --done-bg: rgba(0,240,255,.08);
+    --done-border: rgba(0,240,255,.4);
+
+    --log-fg: #fff;
+
+    --pill-bg: rgba(255,46,176,.18);
+    --pill-fg: #FF2EB0;
+
+    --name-case: none;
+    --name-spacing: 0;
+  }
+  .t3 .log, .t3 .pill, .t3 .ex-name .dot-active {
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+  .t3 .ex.active { box-shadow: 0 0 16px rgba(255,46,176,.15); }
+
+  /* ═══════ THEME 4 — "Terracotta Workshop" ═══════ */
+  .t4 {
+    --bg: #1D1310;
+    --surface: #2A1C16;
+    --surface2: #3A281E;
+    --border: #4A352A;
+    --divider: rgba(216,158,100,.08);
+    --text: #EFE5D8;
+    --muted: #A18874;
+    --mutedX: #6E5B4D;
+
+    --accent: #D97543;
+    --accent-glow: rgba(217,117,67,.28);
+    --accent-tint: rgba(217,117,67,.15);
+
+    --ok: #C4A35A;
+    --ok-tint: rgba(196,163,90,.15);
+
+    --danger: #C14038;
+    --danger-tint: rgba(193,64,56,.18);
+
+    --radius: 10px;
+    --pill-radius: 6px;
+    --input-radius: 8px;
+    --check-radius: 10px;
+
+    --font-display: Fraunces, Georgia, serif;
+    --font-body: Inter, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    --active-bg: linear-gradient(180deg, rgba(217,117,67,.08), #2A1C16 70%);
+    --active-border: rgba(217,117,67,.4);
+    --done-bg: rgba(196,163,90,.08);
+    --done-border: rgba(196,163,90,.3);
+
+    --log-fg: #1D1310;
+
+    --pill-bg: rgba(217,117,67,.16);
+    --pill-fg: #D97543;
+
+    --name-case: none;
+    --name-spacing: 0;
+  }
+
+  /* ═══════ THEME 5 — "Sage Clinical" (LIGHT) ═══════ */
+  .t5 {
+    --bg: #EEF2ED;
+    --surface: #FFFFFF;
+    --surface2: #E4EAE1;
+    --border: #CAD3C6;
+    --divider: rgba(0,0,0,.05);
+    --text: #1E2A24;
+    --muted: #6B7A70;
+    --mutedX: #98A49C;
+
+    --accent: #4A9B6E;
+    --accent-glow: rgba(74,155,110,.22);
+    --accent-tint: rgba(74,155,110,.10);
+
+    --ok: #2F7A4B;
+    --ok-tint: rgba(47,122,75,.10);
+
+    --danger: #B84338;
+    --danger-tint: rgba(184,67,56,.14);
+
+    --radius: 14px;
+    --pill-radius: 10px;
+    --input-radius: 10px;
+    --check-radius: 10px;
+
+    --font-display: Inter, sans-serif;
+    --font-body: Inter, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    --active-bg: linear-gradient(180deg, rgba(74,155,110,.08), #FFFFFF 60%);
+    --active-border: rgba(74,155,110,.35);
+    --done-bg: rgba(74,155,110,.06);
+    --done-border: rgba(74,155,110,.25);
+
+    --log-fg: #FFFFFF;
+
+    --pill-bg: rgba(74,155,110,.14);
+    --pill-fg: #2F7A4B;
+
+    --name-case: none;
+    --name-spacing: 0;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <h1>IronLog — 5 theme directions</h1>
+  <p class="lede">
+    Same layout, same content, five very different visual identities. Pick the one that
+    feels right in the hand. Content snapshot: mid-Workout A —
+    <b>Machine Bench Press</b> DONE, <b>Lat Pulldown</b> ACTIVE (set 1 at 60×7,
+    set 2 pending at auto-backed-off 50 kg), <b>Seated Row</b> PENDING.
+  </p>
+
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+  const THEMES = [
+    {
+      cls: "t1",
+      title: "Brutalist Lime",
+      sub: "high-contrast black / electric lime / sharp corners",
+      caption: "<b>Pure tool.</b> Zero rounding, full caps on exercise names, monospace pills. Lime accent is unmissable even with bad lighting. Log button is lime on black — hardest to miss mid-set. Reads as 'serious strength equipment', not 'consumer fitness app'."
+    },
+    {
+      cls: "t2",
+      title: "Editorial Paper",
+      sub: "cream light mode, muted red, serif display",
+      caption: "<b>Quiet training journal.</b> Light-mode cream with ink text; a muted red accent for state. Serif display font gives it weight. Excellent outdoors / bright gym readability, low eye strain. Closest to a paper log book."
+    },
+    {
+      cls: "t3",
+      title: "Synthwave Neon",
+      sub: "deep purple, hot pink, cyan glow",
+      caption: "<b>Loud and playful.</b> Gradient surfaces, hot-pink accent with soft glow, cyan for success. Higher visual cost but very emotional — this is the 'headphones on, rep time' theme. Glow highlights current set without requiring focus."
+    },
+    {
+      cls: "t4",
+      title: "Terracotta Workshop",
+      sub: "warm dark brown, terracotta, serif headings",
+      caption: "<b>Old-gym leather-and-iron.</b> Warm dark browns instead of cold black, terracotta accent, amber success. Serif display font recalls strength manuals. Calmer than the default blue; feels less 'SaaS', more 'craft'."
+    },
+    {
+      cls: "t5",
+      title: "Sage Clinical",
+      sub: "near-white, sage green, soft rounding",
+      caption: "<b>Wellness / clinical.</b> Near-white background, sage accent, generous rounding. Most neutral and airy. Best for someone who already uses a lot of dark apps and wants gym time to feel lighter. Gentlest on the eyes indoors."
+    },
+  ];
+
+  function doneCard() {
+    return `
+      <div class="ex done">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="check">✓</span>Machine Bench Press</div>
+            <div class="ex-sub">2 sets · all logged</div>
+          </div>
+          <span class="pill done">DONE</span>
+        </div>
+        <div class="chips">
+          <span class="chip">55 × 8</span>
+          <span class="chip">50 × 5</span>
+        </div>
+      </div>`;
+  }
+
+  function activeCard() {
+    // Set 1: logged 60 kg × 7 (in range) ; Set 2: pending, kg=50 (back-off)
+    return `
+      <div class="ex active">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>Lat Pulldown (Cable)</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">5–8</span>
+        </div>
+        <div class="coach">Hit top of range — try +5 kg</div>
+        <div class="divider"></div>
+
+        <div class="set logged">
+          <div class="set-n">SET 1</div>
+          <div class="stp locked">
+            <span class="b">−</span><span class="v">60</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="stp tint-ok locked">
+            <span class="b">−</span><span class="v">7</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="log del">×</div>
+        </div>
+
+        <div class="set current">
+          <div class="set-n">SET 2</div>
+          <div class="stp">
+            <span class="b">−</span><span class="v">50</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="stp">
+            <span class="b">−</span><span class="v ph">7</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="log disabled">LOG</div>
+        </div>
+      </div>`;
+  }
+
+  function pendingCard() {
+    return `
+      <div class="ex pending">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">Seated Row (Machine)</div>
+            <div class="ex-sub">2 sets · last 60 kg × 8</div>
+          </div>
+          <span class="pill pending">6–10</span>
+        </div>
+      </div>`;
+  }
+
+  function phone() {
+    return `
+      <div class="topbar">
+        <span class="elapsed">14:02</span>
+        <span class="progress">3 / 14 sets</span>
+      </div>
+      <div class="stack">
+        ${doneCard()}
+        ${activeCard()}
+        ${pendingCard()}
+      </div>
+    `;
+  }
+
+  function card(idx, theme) {
+    return `
+      <div class="wrap">
+        <div class="wrap-hdr">
+          <div class="idx">THEME ${String(idx).padStart(2, '0')}</div>
+          <div class="wrap-title">${theme.title}</div>
+          <div class="wrap-sub">${theme.sub}</div>
+        </div>
+        <div class="phone ${theme.cls}">${phone()}</div>
+        <div class="wrap-cap">${theme.caption}</div>
+      </div>
+    `;
+  }
+
+  document.getElementById('gallery').innerHTML =
+    THEMES.map((t, i) => card(i + 1, t)).join('');
+</script>
+</body>
+</html>

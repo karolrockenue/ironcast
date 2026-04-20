@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IronCast — Logo Concepts</title>
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --surface: #1A1A1A;
+    --border: #333333;
+    --text: #F5F5F5;
+    --muted: #999999;
+    --accent: #4A90D9;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 14px; letter-spacing: 3px; color: var(--muted); font-weight: 800; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+  .row { display: flex; flex-direction: column; gap: 28px; }
+  .concept { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 44px 32px; }
+  .stage { display: flex; align-items: center; justify-content: center; min-height: 200px; }
+  .meta { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 16px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+  .title { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: var(--text); }
+  .desc  { font-size: 12px; color: var(--muted); line-height: 1.5; max-width: 520px; text-align: right; }
+
+  /* Shared heavy face */
+  .heavy { font-family: Impact, "Arial Narrow", "Helvetica Neue Condensed", sans-serif; font-weight: 900; }
+
+  /* 1. STACKED BRUTALIST (current splash style) */
+  .c1 { text-align: center; }
+  .c1 .line { font-size: 96px; letter-spacing: 5px; line-height: 0.9; }
+  .c1 .iron { color: var(--text); }
+  .c1 .cast { color: var(--accent); margin-top: -6px; }
+  .c1 .bar { width: 88px; height: 4px; background: var(--accent); margin: 16px auto 0; }
+  .c1 .tag { margin-top: 12px; font-size: 10px; letter-spacing: 4px; color: rgba(255,255,255,0.4); font-weight: 700; }
+
+  /* 2. HORIZONTAL WORDMARK */
+  .c2 .word { font-size: 78px; letter-spacing: 4px; line-height: 1; color: var(--text); }
+  .c2 .word .cast { color: var(--accent); }
+
+  /* 3. PLATE + WORDMARK */
+  .c3 { display: flex; align-items: center; gap: 22px; }
+  .c3 svg { width: 112px; height: 112px; flex: none; }
+  .c3 .stack { display: flex; flex-direction: column; }
+  .c3 .a { font-size: 52px; letter-spacing: 3px; line-height: 0.9; color: var(--text); }
+  .c3 .b { font-size: 52px; letter-spacing: 3px; line-height: 0.9; color: var(--accent); margin-top: -4px; }
+
+  /* 4. STAMP — framed rectangle */
+  .c4 .box { border: 3px solid var(--accent); padding: 18px 44px 22px; display: inline-block; }
+  .c4 .word { font-size: 72px; letter-spacing: 6px; line-height: 1; color: var(--text); }
+  .c4 .word .cast { color: var(--accent); }
+  .c4 .small { display: block; margin-top: 6px; font-size: 10px; letter-spacing: 6px; color: var(--muted); font-weight: 800; text-align: center; }
+
+  /* 5. MONOGRAM IC */
+  .c5 { text-align: center; }
+  .c5 .mono { font-size: 180px; letter-spacing: -10px; line-height: 0.9; }
+  .c5 .i { color: var(--text); }
+  .c5 .cc { color: var(--accent); }
+  .c5 .name { margin-top: 10px; font-size: 12px; letter-spacing: 8px; font-weight: 800; color: var(--muted); }
+
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>IRONCAST · LOGO CONCEPTS</h1>
+  <div class="sub">Five wordmark/logo directions. All use the app palette (#0D0D0D bg, #4A90D9 accent).</div>
+
+  <div class="row">
+
+    <!-- 1 -->
+    <div class="concept">
+      <div class="stage">
+        <div class="c1">
+          <div class="heavy line iron">IRON</div>
+          <div class="heavy line cast">CAST</div>
+          <div class="bar"></div>
+          <div class="tag">ALT A · B · A · B</div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="title">01 · STACKED BRUTALIST</div>
+        <div class="desc">Current splash layout — IRON white on top, CAST accent below, accent divider bar, small tagline. Primary lockup; use this on the splash and launch screen.</div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="concept">
+      <div class="stage">
+        <div class="c2">
+          <div class="heavy word">IRON<span class="cast">CAST</span></div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="title">02 · HORIZONTAL WORDMARK</div>
+        <div class="desc">Single-line version for headers, tab bars, press shots, or anywhere the stacked form is too tall. Same two-tone split.</div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="concept">
+      <div class="stage">
+        <div class="c3">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" rx="22" fill="#4A90D9"/>
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#0D0D0D" stroke-width="6"/>
+            <circle cx="50" cy="50" r="30" fill="none" stroke="#0D0D0D" stroke-width="6"/>
+            <circle cx="50" cy="50" r="6" fill="#0D0D0D"/>
+          </svg>
+          <div class="stack">
+            <div class="heavy a">IRON</div>
+            <div class="heavy b">CAST</div>
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="title">03 · PLATE MARK + WORDMARK</div>
+        <div class="desc">Pairs the chosen app-icon (Plate Edge, concept 05) with the stacked wordmark. Use on marketing/web hero, App Store screenshots, promo assets.</div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="concept">
+      <div class="stage">
+        <div class="c4">
+          <div class="box">
+            <div class="heavy word">IRON<span class="cast">CAST</span></div>
+            <span class="small">STRENGTH LOG</span>
+          </div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="title">04 · STAMP LOCKUP</div>
+        <div class="desc">Framed rectangle — reads like a forged metal stamp. Adds a descriptor ("STRENGTH LOG"). Good for merch, footer badges, or splash alternative.</div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="concept">
+      <div class="stage">
+        <div class="c5">
+          <div class="heavy mono"><span class="i">I</span><span class="cc">C</span></div>
+          <div class="name">IRONCAST</div>
+        </div>
+      </div>
+      <div class="meta">
+        <div class="title">05 · IC MONOGRAM</div>
+        <div class="desc">Huge I/C initials, full name in small caps underneath. Most compact; works as favicon, social avatar, app-loader alternative.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

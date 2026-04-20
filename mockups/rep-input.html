@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — rep-input directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg:        #0D0D0D;
+    --surface:   #1A1A1A;
+    --surface2:  #252525;
+    --border:    #333;
+    --text:      #F5F5F5;
+    --muted:     #999;
+    --accent:    #4A90D9;
+    --accent-tint: rgba(74,144,217,.15);
+    --accent-band: rgba(74,144,217,.20);
+    --warn:      #FFA726;
+    --warn-tint: rgba(255,167,38,.16);
+    --ok:        #4CAF50;
+    --ok-tint:   rgba(76,175,80,.22);
+    --danger:    #E05555;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 32px 28px 8px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; }
+  .lede {
+    color: var(--muted); font-size: 14px; margin-top: 6px; max-width: 760px;
+    line-height: 1.5;
+  }
+  .context {
+    display: inline-flex; gap: 14px; align-items: center;
+    background: var(--surface); padding: 10px 14px; border-radius: 10px;
+    margin-top: 16px;
+  }
+  .context b { font-weight: 700; color: var(--text); }
+  .context span { color: var(--muted); font-size: 13px; }
+  .dot-accent { width: 8px; height: 8px; border-radius: 4px; background: var(--accent); display: inline-block; }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 20px;
+    padding: 24px 28px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 18px;
+    display: flex; flex-direction: column;
+    min-height: 440px;
+  }
+  .idx {
+    font-size: 11px; letter-spacing: 2px; color: var(--muted); font-weight: 700;
+  }
+  .name { font-size: 19px; font-weight: 800; margin-top: 4px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .body { flex: 1; padding-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .caption {
+    font-size: 12px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 10px; margin-top: 12px; line-height: 1.4;
+  }
+  .caption b { color: var(--text); font-weight: 700; }
+
+  /* Weight stepper — reused */
+  .wt {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border-radius: 10px;
+    padding: 4px;
+  }
+  .wt button {
+    width: 40px; height: 36px; border: 0; border-radius: 8px;
+    background: transparent; color: var(--text); font-weight: 700;
+    cursor: pointer; font-size: 14px;
+  }
+  .wt button:hover { background: rgba(255,255,255,.06); }
+  .wt .val {
+    flex: 1; text-align: center; font-size: 18px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .wt .unit { font-size: 11px; color: var(--muted); margin-right: 8px; }
+
+  .prescription {
+    display: flex; gap: 12px; align-items: center;
+    font-size: 12px; color: var(--muted);
+  }
+  .prescription b { color: var(--text); font-weight: 700; }
+  .pill {
+    display: inline-block; padding: 3px 8px; border-radius: 6px;
+    background: var(--accent-tint); color: var(--accent); font-weight: 700;
+    font-size: 11px; letter-spacing: .5px;
+  }
+
+  /* Reusable commit button */
+  .commit {
+    margin-top: auto;
+    padding: 14px; border: 0; border-radius: 12px;
+    background: var(--accent); color: white; font-weight: 800; font-size: 15px;
+    cursor: pointer;
+  }
+  .commit.ghost { background: var(--surface2); color: var(--muted); }
+  .commit.ok { background: var(--ok); }
+
+  /* ────────────────────────────────────────────────────────────────
+     Variation-specific styles
+     ──────────────────────────────────────────────────────────────── */
+
+  /* #1 number line */
+  .numline { display: flex; justify-content: space-between; gap: 4px; }
+  .numline button {
+    flex: 1; padding: 14px 0; background: transparent; color: var(--muted);
+    border: 1px solid transparent; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .numline button.in { color: var(--text); background: var(--accent-band); }
+  .numline button.sel { background: var(--accent); color: #fff; }
+  .numline button.low { color: #777; }
+
+  /* #2 vertical ladder */
+  .ladder { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .ladder button {
+    padding: 12px 0; border: 0; border-radius: 10px; background: var(--surface2);
+    color: var(--muted); font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .ladder button.in { color: var(--text); background: var(--accent-band); }
+  .ladder button.sel { background: var(--accent); color: #fff; }
+
+  /* #3 slider-style bar */
+  .slider { position: relative; height: 40px; }
+  .slider-track {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden;
+  }
+  .slider-band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); }
+  .slider-thumb {
+    position: absolute; top: 50%; width: 24px; height: 24px; border-radius: 14px;
+    background: var(--accent); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(74,144,217,.22);
+  }
+  .slider-ticks {
+    position: absolute; inset: 0; display: flex; justify-content: space-between;
+    align-items: center; color: var(--muted); font-size: 10px;
+    padding: 0 4px;
+  }
+  .slider-val { font-size: 54px; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+
+  /* #4 ring gauge */
+  .ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ring-val { font-size: 52px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .ring-hint { font-size: 11px; color: var(--muted); letter-spacing: 1.5px; }
+
+  /* #5 per-set timeline */
+  .setline { display: flex; flex-direction: column; gap: 10px; }
+  .setline-row { display: grid; grid-template-columns: 56px 1fr 40px; align-items: center; gap: 10px; }
+  .setline-label { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .setline-bar { position: relative; height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+  .setline-band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); }
+  .setline-dot {
+    position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 8px;
+    background: var(--text); transform: translate(-50%, -50%);
+    border: 2px solid var(--bg);
+  }
+  .setline-dot.ok { background: var(--ok); }
+  .setline-dot.push { background: var(--accent); }
+  .setline-dot.low { background: var(--warn); }
+  .setline-num { font-size: 13px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+  .setline-pending { opacity: .5; }
+
+  /* #6 stacked result bars */
+  .stacks { display: flex; flex-direction: column; gap: 10px; }
+  .stack { display: flex; align-items: center; gap: 10px; }
+  .stack-label { width: 44px; color: var(--muted); font-size: 12px; font-weight: 700; }
+  .stack-track {
+    flex: 1; height: 22px; background: var(--surface2); border-radius: 6px;
+    position: relative; overflow: hidden;
+  }
+  .stack-band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); }
+  .stack-fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--ok); border-radius: 6px 0 0 6px; }
+  .stack-fill.push { background: var(--accent); }
+  .stack-fill.low { background: var(--warn); }
+  .stack-reps { width: 28px; text-align: right; font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .stack-pending .stack-track { outline: 1.5px dashed rgba(255,255,255,.2); }
+
+  /* #7 central number + pills */
+  .central-num { text-align: center; font-size: 88px; font-weight: 900; letter-spacing: -4px; line-height: 1; margin-top: 4px; }
+  .central-sub { text-align: center; font-size: 12px; color: var(--muted); margin-top: 2px; letter-spacing: 1.5px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+  .pills button {
+    padding: 8px 12px; border-radius: 18px; border: 0;
+    background: var(--surface2); color: var(--muted); font-weight: 700; font-size: 13px;
+    cursor: pointer;
+  }
+  .pills button.in { background: var(--accent-band); color: var(--text); }
+  .pills button.sel { background: var(--accent); color: #fff; }
+
+  /* #8 range cursor */
+  .rangecursor { padding-top: 4px; }
+  .rangecursor .hdr { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .5px; }
+  .rangecursor .bar {
+    position: relative; height: 44px; margin-top: 10px;
+    background: var(--surface2); border-radius: 10px; overflow: hidden;
+  }
+  .rangecursor .band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+  .rangecursor .cursor {
+    position: absolute; top: 0; bottom: 0; width: 4px; background: var(--text);
+  }
+  .rangecursor .cursor::after {
+    content: attr(data-n); position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); font-weight: 800; font-size: 12px;
+    padding: 2px 6px; border-radius: 4px; font-variant-numeric: tabular-nums;
+  }
+  .rangecursor .controls { display: flex; gap: 8px; margin-top: 10px; }
+  .rangecursor .controls button {
+    flex: 1; padding: 10px; border: 0; border-radius: 8px;
+    background: var(--surface2); color: var(--text); font-weight: 700; cursor: pointer;
+  }
+
+  /* #9 halo dots */
+  .halos { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; }
+  .halos button {
+    width: 30px; height: 30px; border-radius: 15px; border: 0;
+    background: var(--surface2); color: var(--muted); font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .halos button.in {
+    background: var(--surface);
+    box-shadow: 0 0 0 3px var(--accent-tint), inset 0 0 0 1.5px var(--accent);
+    color: var(--text);
+  }
+  .halos button.sel {
+    background: var(--accent); color: #fff;
+    box-shadow: 0 0 0 4px var(--accent-tint);
+  }
+
+  /* #10 picker wheel */
+  .wheel {
+    position: relative;
+    height: 180px; overflow: hidden;
+    background: var(--surface2); border-radius: 12px;
+    mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 30%, black 70%, transparent 100%);
+  }
+  .wheel-inner {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .wheel-num { padding: 8px 0; font-size: 18px; font-weight: 700; color: var(--muted); width: 100%; text-align: center; }
+  .wheel-num.in { color: var(--text); background: rgba(74,144,217,.06); }
+  .wheel-num.sel {
+    font-size: 28px; font-weight: 900; color: var(--text);
+    background: var(--accent-band);
+  }
+  .wheel-center {
+    position: absolute; left: 0; right: 0; top: 50%; height: 42px; transform: translateY(-50%);
+    border-top: 1px solid rgba(74,144,217,.3); border-bottom: 1px solid rgba(74,144,217,.3);
+    pointer-events: none;
+  }
+
+  /* #11 progress ladder / steps */
+  .steps { display: flex; gap: 2px; align-items: flex-end; height: 70px; }
+  .steps button {
+    flex: 1; border: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; font-size: 11px; cursor: pointer;
+    border-radius: 2px;
+  }
+  .steps button.in { background: var(--accent-band); color: var(--text); }
+  .steps button.sel { background: var(--accent); color: #fff; }
+
+  /* #12 text input with range feedback */
+  .tinput {
+    width: 100%; padding: 18px; text-align: center; font-size: 42px;
+    font-weight: 900; color: var(--text); background: var(--surface2);
+    border: 1.5px solid transparent; border-radius: 12px;
+    outline: none; font-variant-numeric: tabular-nums;
+  }
+  .tinput:focus { border-color: var(--accent); }
+  .tfeedback {
+    height: 26px; position: relative; background: var(--surface2); border-radius: 6px;
+    overflow: hidden;
+  }
+  .tfeedback-band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); }
+  .tfeedback-marker {
+    position: absolute; top: 0; bottom: 0; width: 3px; background: var(--text);
+  }
+  .tfeedback-label { font-size: 12px; color: var(--muted); margin-top: 4px; text-align: center; }
+
+  /* #13 post-set prompt */
+  .ps-preview { color: var(--muted); font-size: 13px; }
+  .ps-preview .eyebrow { color: var(--muted); font-size: 11px; letter-spacing: 1.5px; font-weight: 700; }
+  .ps-preview .big { color: var(--text); font-size: 24px; font-weight: 800; margin: 4px 0; }
+  .ps-bigbtn {
+    margin-top: 12px; padding: 26px; font-size: 16px; font-weight: 800;
+    text-align: center; border: 2px dashed var(--accent); border-radius: 14px;
+    background: transparent; color: var(--accent); cursor: pointer;
+  }
+  .ps-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 10px; display: none; }
+  .ps-grid button {
+    padding: 14px 0; border: 0; background: var(--surface2); color: var(--muted);
+    font-weight: 700; border-radius: 8px; cursor: pointer;
+  }
+  .ps-grid button.in { background: var(--accent-band); color: var(--text); }
+  .ps-grid button.sel { background: var(--accent); color: #fff; }
+  .ps-active .ps-bigbtn { display: none; }
+  .ps-active .ps-grid { display: grid !important; }
+
+  /* #14 dual-pane */
+  .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .dual-title { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px; }
+  .dual-stepper { background: var(--surface2); border-radius: 12px; padding: 14px; text-align: center; }
+  .dual-stepper .val { font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .dual-stepper .row { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
+  .dual-stepper button { width: 44px; height: 34px; border: 0; border-radius: 8px; background: var(--bg); color: var(--text); font-weight: 700; cursor: pointer; }
+  .dual-col .numline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .dual-col .numline button { padding: 10px 0; font-size: 14px; }
+
+  /* #15 primary timeline */
+  .tl-wrap { padding: 6px 0; }
+  .tl-hdr { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); letter-spacing: 1.5px; font-weight: 700; }
+  .tl-bar {
+    position: relative; height: 56px; margin-top: 16px;
+    background: var(--surface2); border-radius: 10px; overflow: hidden; cursor: pointer;
+  }
+  .tl-band {
+    position: absolute; top: 0; bottom: 0;
+    background: var(--accent-band);
+    border-left: 2px solid var(--accent); border-right: 2px solid var(--accent);
+  }
+  .tl-band::before { content: "OPTIMAL"; position: absolute; top: 4px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: 1.5px; color: var(--accent); font-weight: 800; }
+  .tl-ticks { position: absolute; inset: 0; display: flex; justify-content: space-between; padding: 0 8px; align-items: flex-end; padding-bottom: 4px; }
+  .tl-ticks span { font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tl-prev {
+    position: absolute; top: 4px; width: 8px; height: 8px; border-radius: 4px;
+    background: rgba(255,255,255,.3); transform: translateX(-50%);
+  }
+  .tl-marker {
+    position: absolute; top: -4px; bottom: -4px; width: 4px; background: var(--text);
+    transform: translateX(-50%);
+    box-shadow: 0 0 0 3px rgba(245,245,245,.15);
+    border-radius: 2px;
+  }
+  .tl-marker.sel { background: var(--ok); box-shadow: 0 0 0 4px rgba(76,175,80,.22); }
+  .tl-caption { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  .tl-val { font-size: 16px; font-weight: 900; color: var(--text); margin-top: 4px; text-align: center; font-variant-numeric: tabular-nums; }
+  .tl-legend { display: flex; gap: 12px; justify-content: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .tl-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .tl-legend .d { width: 8px; height: 8px; border-radius: 4px; display: inline-block; }
+
+  /* Misc */
+  .hdr-split {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rep input — 15 directions</h1>
+  <p class="lede">
+    The log flow should never pre-commit to a rep count — you don't know your reps
+    until you've done the set. Every mockup below lets you see the target range at a
+    glance and commit a rep count <b>after</b> the set. Tap around; each card is live.
+  </p>
+  <div class="context">
+    <span class="dot-accent"></span>
+    <span><b>Lat Pulldown</b> · Set 2 of 2 · <b>60 kg</b> · target <b>6–10 reps</b> · last time 60kg × 8</span>
+  </div>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+  // Common context — used to render every card.
+  const CTX = {
+    name: "Lat Pulldown",
+    setInfo: "Set 2 of 2",
+    weight: 60,
+    rep_min: 6,
+    rep_max: 10,
+    lastWeight: 60, lastReps: 8,
+    absMin: 1, absMax: 20,
+  };
+  const inRange = (n) => n >= CTX.rep_min && n <= CTX.rep_max;
+  const rangePct = () => {
+    const lo = ((CTX.rep_min - 1) / (CTX.absMax - 1)) * 100;
+    const hi = ((CTX.rep_max - 1) / (CTX.absMax - 1)) * 100;
+    return { lo, hi };
+  };
+
+  // Generic card shell
+  function shell(idx, title, subtitle, body, caption) {
+    return `
+      <div class="card">
+        <div class="hdr-split">
+          <div>
+            <div class="idx">VARIATION ${String(idx).padStart(2,'0')}</div>
+            <div class="name">${title}</div>
+            <div class="meta">${subtitle}</div>
+          </div>
+          <span class="pill">6–10</span>
+        </div>
+        <div class="body">${body}</div>
+        <div class="caption">${caption}</div>
+      </div>
+    `;
+  }
+
+  // ── 01 number line ────────────────────────────────────────
+  function v1() {
+    let html = '<div class="numline">';
+    for (let n = 3; n <= 15; n++) {
+      const cls = inRange(n) ? 'in' : (n < CTX.rep_min ? 'low' : '');
+      html += `<button data-n="${n}" class="${cls}">${n}</button>`;
+    }
+    html += '</div>';
+    html += `<div style="font-size:11px; color:var(--muted); text-align:center; margin-top:-4px;">
+              after your set, tap the rep count
+            </div>`;
+    html += `<button class="commit ghost" disabled>tap a number</button>`;
+    return shell(1, CTX.name, CTX.setInfo + ' · 60 kg',
+      `<div class="prescription">
+         <span>TARGET <b>6–10</b></span>
+         <span>REST <b>2:30</b></span>
+         <span>LAST <b>60 × 8</b></span>
+       </div>` + html,
+      "<b>Number line.</b> Every rep count in one tap. The in-range zone is the highlighted middle band. Low-rep choices (&lt;6) are dimmed but still tappable."
+    );
+  }
+
+  // ── 02 vertical ladder ────────────────────────────────────
+  function v2() {
+    let html = '<div class="ladder">';
+    for (let n = 3; n <= 15; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      html += `<button data-n="${n}" class="${cls}">${n}</button>`;
+    }
+    html += '</div>';
+    return shell(2, CTX.name, CTX.setInfo + ' · 60 kg',
+      `<div class="prescription">
+         <span>TARGET <b>6–10</b></span>
+         <span>REST <b>2:30</b></span>
+       </div>` + html + `<button class="commit ghost" disabled>tap a number</button>`,
+      "<b>Grid of pills.</b> Same idea as #1 but in a grid — easier to hit bigger numbers. The range colors the center cluster."
+    );
+  }
+
+  // ── 03 slider / cursor bar ────────────────────────────────
+  function v3() {
+    const r = rangePct();
+    const initN = 8;
+    const pct = ((initN - 1) / (CTX.absMax - 1)) * 100;
+    return shell(3, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="slider-val" data-slider-val>${initN}</div>
+      <div class="slider" data-slider>
+        <div class="slider-track">
+          <div class="slider-band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+        </div>
+        <div class="slider-thumb" style="left:${pct}%"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); font-variant-numeric: tabular-nums; margin-top:-4px;">
+        <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
+      </div>
+      <div style="font-size:12px; color:var(--muted); text-align:center; margin-top:10px;">
+        drag or tap the bar to set reps
+      </div>
+      <button class="commit ok">Log ${initN} reps @ 60 kg</button>
+    `, "<b>Slider with range band.</b> The optimal zone is visible on the track; the thumb is the committed number. Feels continuous but snaps to integers.");
+  }
+
+  // ── 04 ring gauge ─────────────────────────────────────────
+  function v4() {
+    const SIZE = 200, STROKE = 16, R = (SIZE - STROKE) / 2, CIRC = 2 * Math.PI * R;
+    const rangeStart = (CTX.rep_min - 1) / (CTX.absMax - 1);
+    const rangeEnd   = (CTX.rep_max - 1) / (CTX.absMax - 1);
+    const n = 8, nFrac = (n - 1) / (CTX.absMax - 1);
+    // arc length settings: range zone
+    const bandDash = `${(rangeEnd - rangeStart) * CIRC} ${CIRC}`;
+    const bandOff = -rangeStart * CIRC;
+    const needleAngle = -90 + 360 * nFrac;
+
+    return shell(4, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="ring-wrap">
+        <svg width="${SIZE}" height="${SIZE}">
+          <circle cx="${SIZE/2}" cy="${SIZE/2}" r="${R}" fill="none" stroke="#2a2a2a" stroke-width="${STROKE}" />
+          <circle cx="${SIZE/2}" cy="${SIZE/2}" r="${R}" fill="none" stroke="var(--accent-band)" stroke-width="${STROKE}"
+                  stroke-dasharray="${bandDash}" stroke-dashoffset="${bandOff}"
+                  transform="rotate(-90 ${SIZE/2} ${SIZE/2})" />
+          <g transform="translate(${SIZE/2} ${SIZE/2}) rotate(${needleAngle})">
+            <line x1="0" y1="-${R - 6}" x2="0" y2="-${R + 10}" stroke="var(--text)" stroke-width="3" stroke-linecap="round" />
+          </g>
+          <text x="${SIZE/2}" y="${SIZE/2 + 4}" text-anchor="middle" fill="var(--text)"
+                font-size="48" font-weight="900" font-family="inherit">${n}</text>
+          <text x="${SIZE/2}" y="${SIZE/2 + 28}" text-anchor="middle" fill="var(--muted)"
+                font-size="10" letter-spacing="2" font-family="inherit">REPS</text>
+        </svg>
+        <div class="ring-hint">range 6–10 shown on ring</div>
+      </div>
+      <button class="commit ok">Log 8 reps @ 60 kg</button>
+    `, "<b>Speedometer gauge.</b> The optimal range is a green arc; the needle shows where your rep count lands. Big and legible after a sweaty set.");
+  }
+
+  // ── 05 per-set timeline bars ──────────────────────────────
+  function v5() {
+    const r = rangePct();
+    const sets = [
+      { n: 1, reps: 8, state: 'ok' },
+      { n: 2, reps: null, state: null },
+    ];
+    let rows = '';
+    for (const s of sets) {
+      const dotPct = s.reps !== null ? ((s.reps - 1) / (CTX.absMax - 1)) * 100 : null;
+      rows += `
+        <div class="setline-row ${s.reps === null ? 'setline-pending' : ''}">
+          <div class="setline-label">SET ${s.n}</div>
+          <div class="setline-bar">
+            <div class="setline-band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+            ${s.reps !== null ? `<div class="setline-dot ${s.state}" style="left:${dotPct}%"></div>` : ''}
+          </div>
+          <div class="setline-num">${s.reps !== null ? s.reps : '—'}</div>
+        </div>`;
+    }
+    return shell(5, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="setline">${rows}</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+        Done Set 2? Slide to the rep count on the bar.
+      </div>
+      <button class="commit ok">Log Set 2</button>
+    `, "<b>Per-set timeline.</b> Each prescribed set gets its own bar. Logged sets leave a colored dot in-range / out-of-range; the pending set is the one to fill in.");
+  }
+
+  // ── 06 stacked result bars ────────────────────────────────
+  function v6() {
+    const r = rangePct();
+    const sets = [
+      { n:1, reps: 8, state: 'ok' },
+      { n:2, reps: null },
+    ];
+    let rows = '';
+    for (const s of sets) {
+      const fillPct = s.reps !== null ? ((s.reps - 1) / (CTX.absMax - 1)) * 100 : 0;
+      rows += `
+        <div class="stack ${s.reps === null ? 'stack-pending' : ''}">
+          <div class="stack-label">SET ${s.n}</div>
+          <div class="stack-track">
+            <div class="stack-band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+            ${s.reps !== null ? `<div class="stack-fill ${s.state}" style="width:${fillPct}%"></div>` : ''}
+          </div>
+          <div class="stack-reps">${s.reps !== null ? s.reps : '—'}</div>
+        </div>`;
+    }
+    return shell(6, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="stacks">${rows}</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+        After your set, tap anywhere on the pending bar to fill it.
+      </div>
+      <button class="commit ok">Log Set 2</button>
+    `, "<b>Growth bars.</b> Sets look like bars filling up. Range appears as a green underlay. Visceral: you can see how your rep count compares to target.");
+  }
+
+  // ── 07 central number + pill row ──────────────────────────
+  function v7() {
+    let pills = '';
+    for (let n = 4; n <= 14; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      pills += `<button class="${cls}" data-n="${n}">${n}</button>`;
+    }
+    return shell(7, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="central-num" data-cnum>—</div>
+      <div class="central-sub">TAP YOUR REP COUNT</div>
+      <div class="pills" data-pills>${pills}</div>
+      <button class="commit ghost" disabled>tap a number to enable</button>
+    `, "<b>Big number + pills.</b> The center is empty until you commit — forcing the 'did the set' → 'log what I did' flow. In-range pills are tinted.");
+  }
+
+  // ── 08 range cursor with +/- ──────────────────────────────
+  function v8() {
+    const r = rangePct();
+    const n = 8;
+    const pct = ((n - 1) / (CTX.absMax - 1)) * 100;
+    return shell(8, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="rangecursor">
+        <div class="hdr"><span>1 rep</span><span>TARGET 6–10</span><span>20</span></div>
+        <div class="bar">
+          <div class="band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+          <div class="cursor" style="left:${pct}%" data-n="${n}"></div>
+        </div>
+        <div class="controls">
+          <button>−1</button>
+          <button>+1</button>
+        </div>
+      </div>
+      <button class="commit ok">Log 8 reps @ 60 kg</button>
+    `, "<b>Target cursor.</b> A persistent band labeled 'TARGET 6–10' with a draggable cursor. Works well when you prefer hardware-feeling ± controls.");
+  }
+
+  // ── 09 halo dots ──────────────────────────────────────────
+  function v9() {
+    let dots = '';
+    for (let n = 1; n <= 15; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      dots += `<button class="${cls}" data-n="${n}">${n}</button>`;
+    }
+    return shell(9, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="halos">${dots}</div>
+      <div style="font-size:12px; color:var(--muted); text-align:center;">
+        Halo = in target range. Tap a dot to log.
+      </div>
+      <button class="commit ghost" disabled>tap a number</button>
+    `, "<b>Rep dots with halos.</b> Numbers as round buttons; range members glow. Visually playful, same one-tap commit as #1.");
+  }
+
+  // ── 10 picker wheel ───────────────────────────────────────
+  function v10() {
+    let items = '';
+    for (let n = 1; n <= 20; n++) {
+      let cls = '';
+      if (n === 8) cls = 'sel';
+      else if (inRange(n)) cls = 'in';
+      items += `<div class="wheel-num ${cls}">${n}</div>`;
+    }
+    return shell(10, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <div class="dual-title">WEIGHT</div>
+          <div class="dual-stepper"><div class="val">60</div><div class="row"><button>−2.5</button><button>+2.5</button></div></div>
+        </div>
+        <div style="flex:1;">
+          <div class="dual-title">REPS</div>
+          <div class="wheel">
+            <div class="wheel-inner">${items}</div>
+            <div class="wheel-center"></div>
+          </div>
+        </div>
+      </div>
+      <button class="commit ok">Log set</button>
+    `, "<b>iOS-style wheel.</b> Flick to the rep count. The optimal range is a faint highlight; the center row is what gets committed.");
+  }
+
+  // ── 11 progress steps ─────────────────────────────────────
+  function v11() {
+    let html = '<div class="steps">';
+    for (let n = 1; n <= 15; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      const h = 20 + (n / 15) * 50;
+      html += `<button class="${cls}" style="height:${h}px" data-n="${n}">${n}</button>`;
+    }
+    html += '</div>';
+    return shell(11, CTX.name, CTX.setInfo + ' · 60 kg',
+      html + `
+      <div style="font-size:12px; color:var(--muted); text-align:center; margin-top:8px;">
+        Ramp chart — taller = more reps. Green cluster = target.
+      </div>
+      <button class="commit ghost" disabled>tap a step</button>
+    `, "<b>Ramp histogram.</b> Each rep count is a bar that grows with the number. Green cluster is the target. Physically suggests 'more reps' visually.");
+  }
+
+  // ── 12 text input + feedback ──────────────────────────────
+  function v12() {
+    const r = rangePct();
+    const n = 8;
+    const pct = ((n - 1) / (CTX.absMax - 1)) * 100;
+    return shell(12, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <input class="tinput" inputmode="numeric" value="" placeholder="reps" />
+      <div class="tfeedback">
+        <div class="tfeedback-band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+        <div class="tfeedback-marker" style="left:${pct}%"></div>
+      </div>
+      <div class="tfeedback-label">your entry shows up on the bar</div>
+      <button class="commit ok">Log reps</button>
+    `, "<b>Typed input with range feedback.</b> Type the number; a bar below shows where it falls in the range. Max freedom, minimal pre-commit.");
+  }
+
+  // ── 13 post-set prompt (two-step) ─────────────────────────
+  function v13() {
+    let grid = '';
+    for (let n = 1; n <= 15; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      grid += `<button class="${cls}" data-n="${n}">${n}</button>`;
+    }
+    return shell(13, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="ps-preview" data-ps>
+        <div class="eyebrow">TARGET RANGE</div>
+        <div class="big">6–10 reps @ 60 kg</div>
+        <div>last time · 60 kg × 8</div>
+        <button class="ps-bigbtn" data-ps-btn>I finished the set →</button>
+        <div class="ps-grid">${grid}</div>
+      </div>
+      <button class="commit ok">Log reps</button>
+    `, "<b>Two-step commit.</b> Before the set, you only see the target. Tap 'I finished the set' and the rep picker slides in. Least accidental input.");
+  }
+
+  // ── 14 dual-pane (weight + reps) ──────────────────────────
+  function v14() {
+    let buttons = '';
+    for (let n = 5; n <= 13; n++) {
+      const cls = inRange(n) ? 'in' : '';
+      buttons += `<button class="${cls}" data-n="${n}">${n}</button>`;
+    }
+    return shell(14, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="dual">
+        <div class="dual-col">
+          <div class="dual-title">WEIGHT</div>
+          <div class="dual-stepper">
+            <div class="val">60</div>
+            <div class="row"><button>−2.5</button><button>+2.5</button></div>
+          </div>
+        </div>
+        <div class="dual-col">
+          <div class="dual-title">REPS <span style="color:var(--accent)">6–10</span></div>
+          <div class="numline">${buttons}</div>
+        </div>
+      </div>
+      <button class="commit ghost" disabled>tap a rep count</button>
+    `, "<b>Side-by-side panes.</b> Weight is a stepper (rarely changes mid-set), reps is a tap grid with the range highlighted. Clear separation of intents.");
+  }
+
+  // ── 15 primary timeline (the user's described idea) ───────
+  function v15() {
+    const r = rangePct();
+    const prevWorkouts = [
+      { reps: 8, label: 'last' },
+      { reps: 7, label: '-2' },
+      { reps: 6, label: '-3' },
+    ];
+    let prevDots = '';
+    for (const p of prevWorkouts) {
+      const pct = ((p.reps - 1) / (CTX.absMax - 1)) * 100;
+      prevDots += `<div class="tl-prev" style="left:${pct}%"></div>`;
+    }
+    return shell(15, CTX.name, CTX.setInfo + ' · 60 kg', `
+      <div class="tl-wrap">
+        <div class="tl-hdr">
+          <span>1 rep</span>
+          <span>TARGET 6–10</span>
+          <span>20 reps</span>
+        </div>
+        <div class="tl-bar" data-tl>
+          <div class="tl-band" style="left:${r.lo}%; width:${r.hi - r.lo}%"></div>
+          ${prevDots}
+          <div class="tl-ticks">
+            <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
+          </div>
+        </div>
+        <div class="tl-legend">
+          <span><span class="d" style="background:rgba(255,255,255,.3)"></span>previous sessions</span>
+          <span><span class="d" style="background:var(--accent)"></span>target range</span>
+        </div>
+        <div class="tl-caption">
+          Tap the bar where your set landed.
+        </div>
+        <div class="tl-val" data-tl-val>— reps</div>
+      </div>
+      <button class="commit ghost" disabled>tap the timeline</button>
+    `, "<b>Primary timeline.</b> One wide bar, range band green, past sessions dotted in. Tap anywhere to log. Closest to your description: rep count + target visible together.");
+  }
+
+  const variations = [v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15];
+  document.getElementById('gallery').innerHTML = variations.map(fn => fn()).join('');
+
+  // Interactivity — make cards clickable where obvious.
+  document.querySelectorAll('.numline, .ladder, .pills, .halos, .steps, .ps-grid, .dual-col .numline')
+    .forEach(group => {
+      group.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b || !b.dataset.n) return;
+        group.querySelectorAll('button.sel').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+        const card = b.closest('.card');
+        const commit = card.querySelector('.commit');
+        if (commit) {
+          commit.classList.remove('ghost'); commit.disabled = false;
+          commit.classList.add('ok');
+          commit.textContent = 'Log ' + b.dataset.n + ' reps @ 60 kg';
+        }
+        const cnum = card.querySelector('[data-cnum]');
+        if (cnum) cnum.textContent = b.dataset.n;
+      });
+    });
+
+  // Slider drag (v3)
+  document.querySelectorAll('[data-slider]').forEach(sl => {
+    const thumb = sl.querySelector('.slider-thumb');
+    const val = sl.closest('.card').querySelector('[data-slider-val]');
+    const commit = sl.closest('.card').querySelector('.commit');
+    const set = (pct) => {
+      pct = Math.max(0, Math.min(100, pct));
+      const n = Math.round(((pct / 100) * (CTX.absMax - 1)) + 1);
+      thumb.style.left = (((n - 1) / (CTX.absMax - 1)) * 100) + '%';
+      if (val) val.textContent = n;
+      if (commit) commit.textContent = `Log ${n} reps @ 60 kg`;
+    };
+    let dragging = false;
+    const getPct = (evt) => {
+      const r = sl.getBoundingClientRect();
+      const x = (evt.touches ? evt.touches[0].clientX : evt.clientX) - r.left;
+      return (x / r.width) * 100;
+    };
+    sl.addEventListener('mousedown', (e) => { dragging = true; set(getPct(e)); });
+    window.addEventListener('mousemove', (e) => { if (dragging) set(getPct(e)); });
+    window.addEventListener('mouseup', () => { dragging = false; });
+    sl.addEventListener('touchstart', (e) => { dragging = true; set(getPct(e)); });
+    sl.addEventListener('touchmove', (e) => { if (dragging) set(getPct(e)); });
+    sl.addEventListener('touchend', () => { dragging = false; });
+  });
+
+  // Post-set prompt toggle (v13)
+  document.querySelectorAll('[data-ps-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('[data-ps]').classList.add('ps-active');
+    });
+  });
+
+  // Timeline tap (v15)
+  document.querySelectorAll('[data-tl]').forEach(bar => {
+    bar.addEventListener('click', (e) => {
+      const r = bar.getBoundingClientRect();
+      const pct = ((e.clientX - r.left) / r.width) * 100;
+      const n = Math.max(1, Math.min(CTX.absMax, Math.round(((pct / 100) * (CTX.absMax - 1)) + 1)));
+      const pctSnapped = ((n - 1) / (CTX.absMax - 1)) * 100;
+      let marker = bar.querySelector('.tl-marker');
+      if (!marker) {
+        marker = document.createElement('div');
+        marker.className = 'tl-marker sel';
+        bar.appendChild(marker);
+      }
+      marker.style.left = pctSnapped + '%';
+      const card = bar.closest('.card');
+      const val = card.querySelector('[data-tl-val]');
+      if (val) val.textContent = n + ' reps';
+      const commit = card.querySelector('.commit');
+      if (commit) {
+        commit.classList.remove('ghost'); commit.disabled = false;
+        commit.classList.add('ok');
+        commit.textContent = `Log ${n} reps @ 60 kg`;
+      }
+    });
+  });
+
+  // Text input (v12)
+  document.querySelectorAll('.tinput').forEach(inp => {
+    const card = inp.closest('.card');
+    const marker = card.querySelector('.tfeedback-marker');
+    const commit = card.querySelector('.commit');
+    const label = card.querySelector('.tfeedback-label');
+    inp.addEventListener('input', () => {
+      const n = parseInt(inp.value, 10);
+      if (!isNaN(n) && n >= 1 && n <= CTX.absMax) {
+        marker.style.left = (((n - 1) / (CTX.absMax - 1)) * 100) + '%';
+        if (commit) commit.textContent = `Log ${n} reps @ 60 kg`;
+        if (label) label.textContent = inRange(n)
+          ? 'in target — solid set'
+          : n > CTX.rep_max ? 'above target — increase weight next time'
+          : 'below target — consider dropping weight';
+      }
+    });
+  });
+</script>
+</body>
+</html>

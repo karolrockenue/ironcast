@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — home screen directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0D0D0D;
+    --surface:   #1A1A1A;
+    --surface2:  #252525;
+    --surface3:  #2F2F2F;
+    --border:    #333;
+    --divider:   rgba(255,255,255,.05);
+    --text:      #F5F5F5;
+    --muted:     #999;
+    --mutedX:    #666;
+    --accent:    #4A90D9;
+    --accent-tint: rgba(74,144,217,.14);
+    --accent-soft: rgba(74,144,217,.06);
+    --warn:      #FFA726;
+    --warn-tint: rgba(255,167,38,.18);
+    --ok:        #4CAF50;
+    --ok-tint:   rgba(76,175,80,.22);
+    --danger:    #E05555;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #080808;
+    color: var(--text);
+    font-family: -apple-system, Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 32px 28px 12px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; color: #fff; }
+  .lede {
+    color: #999; font-size: 14px; margin-top: 6px; max-width: 780px; line-height: 1.5;
+  }
+  .lede b { color: #fff; font-weight: 700; }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 22px;
+    padding: 24px 28px 60px;
+    max-width: 1600px; margin: 0 auto;
+  }
+
+  .wrap { display: flex; flex-direction: column; }
+  .wrap-hdr {
+    background: #161616; border-radius: 14px 14px 0 0; padding: 14px 16px;
+    border: 1px solid #222; border-bottom: 0;
+  }
+  .idx { font-size: 11px; letter-spacing: 2px; color: #777; font-weight: 700; }
+  .wrap-title { font-size: 16px; font-weight: 800; margin-top: 4px; color: #fff; }
+  .wrap-sub   { font-size: 12px; color: #999; margin-top: 2px; }
+  .wrap-cap {
+    background: #161616; border-radius: 0 0 14px 14px; padding: 12px 16px 14px;
+    font-size: 12px; color: #bbb; line-height: 1.5;
+    border: 1px solid #222; border-top: 0;
+  }
+  .wrap-cap b { color: #fff; font-weight: 700; }
+
+  /* Phone shell */
+  .phone {
+    background: var(--bg);
+    padding: 14px;
+    border-left: 1px solid #222; border-right: 1px solid #222;
+    min-height: 620px;
+    display: flex; flex-direction: column;
+  }
+  .phone .logo {
+    font-size: 22px; font-weight: 900; letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .phone .today {
+    font-size: 11px; letter-spacing: 1.5px; font-weight: 800;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  /* Chips / pills */
+  .pill {
+    display: inline-block;
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 800; letter-spacing: .5px;
+    background: var(--accent-tint); color: var(--accent);
+  }
+  .pill.warn { background: var(--warn-tint); color: var(--warn); }
+  .pill.ok { background: var(--ok-tint); color: var(--ok); }
+  .pill.muted { background: var(--surface2); color: var(--muted); }
+
+  /* ════════════════════════════════════════════
+     V1 — "Focus" — big Start, minimal everything else
+     ════════════════════════════════════════════ */
+  .v1 .resume {
+    background: var(--ok-tint); border: 1px solid rgba(76,175,80,.4);
+    padding: 10px 12px; border-radius: 10px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .v1 .resume .title { font-size: 13px; font-weight: 800; color: var(--ok); }
+  .v1 .resume .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .v1 .hero {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 22px 18px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .v1 .hero .label { font-size: 10px; letter-spacing: 2px; color: var(--mutedX); font-weight: 800; }
+  .v1 .hero .big   { font-size: 52px; font-weight: 900; line-height: 1; color: #fff; margin-top: 6px; letter-spacing: -1px; }
+  .v1 .hero .sub   { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .v1 .hero .dead  {
+    margin-top: 16px; padding: 10px;
+    border-left: 3px solid var(--warn);
+    background: var(--warn-tint); border-radius: 0 8px 8px 0;
+    text-align: left;
+  }
+  .v1 .hero .dead .d1 { font-size: 11px; font-weight: 900; letter-spacing: 1.5px; color: var(--warn); }
+  .v1 .hero .dead .d2 { font-size: 12px; color: var(--text); margin-top: 3px; }
+  .v1 .hero .start {
+    margin-top: 18px;
+    background: var(--accent); color: #fff; padding: 14px; border-radius: 10px;
+    font-size: 15px; font-weight: 900; letter-spacing: 1px;
+  }
+
+  .v1 .recent-strip {
+    margin-top: auto;
+    display: flex; gap: 6px; justify-content: center;
+    padding-top: 12px; border-top: 1px solid var(--divider);
+  }
+  .v1 .dot {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: var(--muted);
+    background: var(--surface);
+  }
+  .v1 .dot.a { background: rgba(74,144,217,.2); color: var(--accent); }
+  .v1 .dot.b { background: rgba(255,167,38,.2); color: var(--warn); }
+  .v1 .recent-lbl { font-size: 10px; color: var(--mutedX); letter-spacing: 1px; text-align: center; padding-top: 4px; }
+
+  /* ════════════════════════════════════════════
+     V2 — "Journal" — reverse-chronological log feed
+     ════════════════════════════════════════════ */
+  .v2 .journal { display: flex; flex-direction: column; gap: 8px; }
+  .v2 .entry {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 12px 14px;
+    border-left: 3px solid var(--surface3);
+  }
+  .v2 .entry.next {
+    background: linear-gradient(180deg, rgba(74,144,217,.12), var(--surface) 60%);
+    border-left-color: var(--accent);
+  }
+  .v2 .entry.inprog {
+    background: linear-gradient(180deg, rgba(76,175,80,.12), var(--surface) 60%);
+    border-left-color: var(--ok);
+  }
+  .v2 .entry .date {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--muted); font-weight: 800;
+  }
+  .v2 .entry .row1 {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 2px;
+  }
+  .v2 .entry .name { font-size: 15px; font-weight: 800; }
+  .v2 .entry .stats {
+    font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .v2 .entry .note {
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+  }
+  .v2 .entry.next .note { color: var(--accent); font-weight: 700; }
+  .v2 .start-btn {
+    margin-top: 10px; padding: 10px; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    font-size: 13px; font-weight: 900; letter-spacing: .5px;
+    text-align: center;
+  }
+  .v2 .resume-btn {
+    margin-top: 10px; padding: 10px; border-radius: 8px;
+    background: var(--ok); color: #fff;
+    font-size: 13px; font-weight: 900; letter-spacing: .5px;
+    text-align: center;
+  }
+
+  /* ════════════════════════════════════════════
+     V3 — "Timeline" — horizontal past→next
+     ════════════════════════════════════════════ */
+  .v3 .timeline {
+    display: flex; gap: 8px; overflow-x: auto;
+    padding: 6px 0 14px;
+    margin: 0 -14px; padding-left: 14px; padding-right: 14px;
+  }
+  .v3 .tl {
+    flex: 0 0 72px;
+    background: var(--surface); border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid transparent;
+  }
+  .v3 .tl.next {
+    background: rgba(74,144,217,.12);
+    border-color: var(--accent);
+    flex-basis: 96px;
+  }
+  .v3 .tl.inprog {
+    background: rgba(76,175,80,.14);
+    border-color: var(--ok);
+  }
+  .v3 .tl .date {
+    font-size: 9px; letter-spacing: 1.5px; color: var(--mutedX); font-weight: 800;
+  }
+  .v3 .tl .plan {
+    font-size: 20px; font-weight: 900; margin-top: 6px;
+  }
+  .v3 .tl.a .plan { color: var(--accent); }
+  .v3 .tl.b .plan { color: var(--warn); }
+  .v3 .tl .stats {
+    font-size: 9px; color: var(--muted); margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .v3 .tl.next .plan { color: #fff; font-size: 28px; }
+  .v3 .tl.next .label {
+    font-size: 8px; letter-spacing: 2px; color: var(--accent); font-weight: 900;
+    margin-top: 2px; text-transform: uppercase;
+  }
+
+  .v3 .detail {
+    background: var(--surface);
+    border-radius: 12px; padding: 14px;
+    margin-top: 14px;
+  }
+  .v3 .detail .label {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--mutedX); font-weight: 800;
+  }
+  .v3 .detail .title { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .v3 .detail .mode {
+    margin-top: 8px; padding: 8px 10px; border-radius: 8px;
+    background: var(--warn-tint);
+    border-left: 3px solid var(--warn);
+  }
+  .v3 .detail .mode .m1 { font-size: 10px; font-weight: 900; letter-spacing: 1.5px; color: var(--warn); }
+  .v3 .detail .mode .m2 { font-size: 12px; color: var(--text); margin-top: 3px; }
+  .v3 .detail .exlist {
+    margin-top: 10px; font-size: 11px; color: var(--muted);
+    line-height: 1.5;
+  }
+  .v3 .detail .start {
+    margin-top: 12px; padding: 14px; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 900; letter-spacing: 1px;
+    text-align: center;
+  }
+
+  /* ════════════════════════════════════════════
+     V4 — "Split" — next up | recent two columns
+     ════════════════════════════════════════════ */
+  .v4 .split {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .v4 .next-card {
+    background: var(--surface); border-radius: 14px; padding: 14px;
+    border: 1px solid rgba(74,144,217,.3);
+    background: linear-gradient(180deg, rgba(74,144,217,.08), var(--surface));
+  }
+  .v4 .next-card .eyebrow {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .v4 .next-card .eyebrow .label {
+    font-size: 10px; letter-spacing: 2px; color: var(--accent); font-weight: 800;
+  }
+  .v4 .next-card .letter {
+    font-size: 40px; font-weight: 900; color: var(--accent); line-height: 1;
+  }
+  .v4 .next-card .name { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .v4 .next-card .meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .v4 .dead-inline {
+    margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+    background: var(--warn-tint);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .v4 .dead-inline .tag { font-size: 10px; font-weight: 900; letter-spacing: 1.5px; color: var(--warn); }
+  .v4 .dead-inline .txt { font-size: 11px; color: var(--text); flex: 1; }
+  .v4 .exlist {
+    margin-top: 10px;
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 11px; color: var(--muted);
+  }
+  .v4 .exlist .ex { display: flex; justify-content: space-between; padding: 2px 0; }
+  .v4 .exlist .ex .n { color: var(--text); }
+  .v4 .exlist .ex .p { font-variant-numeric: tabular-nums; font-size: 10px; }
+  .v4 .next-card .go {
+    margin-top: 14px; padding: 12px; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    font-size: 14px; font-weight: 900; letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .v4 .recent-sec { margin-top: 6px; }
+  .v4 .recent-sec .sec-title {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--mutedX); font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .v4 .recent-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface);
+    border-radius: 8px; padding: 9px 12px;
+    margin-bottom: 5px;
+  }
+  .v4 .recent-row .left { display: flex; align-items: center; gap: 10px; }
+  .v4 .recent-row .chip {
+    width: 24px; height: 24px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 900;
+  }
+  .v4 .recent-row .chip.a { background: rgba(74,144,217,.2); color: var(--accent); }
+  .v4 .recent-row .chip.b { background: rgba(255,167,38,.2); color: var(--warn); }
+  .v4 .recent-row .date { font-size: 11px; color: var(--muted); font-weight: 700; }
+  .v4 .recent-row .stats { font-size: 10px; color: var(--mutedX); font-variant-numeric: tabular-nums; }
+
+  /* ════════════════════════════════════════════
+     V5 — "Dashboard" — stats, next, mini history
+     ════════════════════════════════════════════ */
+  .v5 .stat-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+    margin-bottom: 14px;
+  }
+  .v5 .stat {
+    background: var(--surface); border-radius: 10px;
+    padding: 10px 8px; text-align: center;
+  }
+  .v5 .stat .v { font-size: 20px; font-weight: 900; color: var(--text); font-variant-numeric: tabular-nums; }
+  .v5 .stat .l { font-size: 9px; color: var(--mutedX); letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+
+  .v5 .next {
+    background: var(--surface); border-radius: 14px; padding: 16px;
+    border: 1px solid rgba(74,144,217,.3);
+  }
+  .v5 .next .head {
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .v5 .next .label {
+    font-size: 10px; letter-spacing: 2px; color: var(--accent); font-weight: 900;
+  }
+  .v5 .next .title { font-size: 22px; font-weight: 900; margin-top: 6px; }
+  .v5 .next .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .v5 .next .mode {
+    margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+    background: var(--warn-tint);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .v5 .next .mode .k { font-size: 10px; font-weight: 900; letter-spacing: 1.5px; color: var(--warn); }
+  .v5 .next .mode .v { font-size: 11px; flex: 1; }
+  .v5 .next .start {
+    margin-top: 12px; padding: 14px; border-radius: 10px;
+    background: var(--accent); color: #fff;
+    font-size: 15px; font-weight: 900; letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .v5 .minihistory { margin-top: 14px; }
+  .v5 .minihistory .ttl {
+    font-size: 10px; letter-spacing: 1.5px; color: var(--mutedX); font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .v5 .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .v5 .row:last-child { border-bottom: 0; }
+  .v5 .row .c { display: flex; align-items: center; gap: 10px; }
+  .v5 .row .badge {
+    width: 20px; height: 20px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 900;
+  }
+  .v5 .row .badge.a { background: rgba(74,144,217,.2); color: var(--accent); }
+  .v5 .row .badge.b { background: rgba(255,167,38,.2); color: var(--warn); }
+  .v5 .row .date { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .v5 .row .stat { font-size: 10px; color: var(--mutedX); font-variant-numeric: tabular-nums; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Home screen — 5 directions</h1>
+  <p class="lede">
+    Today is <b>Sun, Apr 19, 2026</b>. Last workout was A on Apr 18. Next up is
+    <b>Workout B — Technique Day</b> (deadlift 70 kg = 75 % of last heavy 95 kg).
+    Five ways to arrange the home screen around that fact. Each shows the same
+    history (the 4 most recent past sessions), varying how prominently "next" vs
+    "recent" are treated.
+  </p>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+  // Past sessions (most recent first)
+  const PAST = [
+    { date: "Apr 18", day: "Sat", plan: "A", duration: 49, sets: 13, note: null },
+    { date: "Apr 15", day: "Wed", plan: "B", duration: 48, sets: 13, note: "Heavy · DL 95×4" },
+    { date: "Apr 13", day: "Mon", plan: "A", duration: 31, sets: 10, note: null },
+    { date: "Apr 10", day: "Fri", plan: "B", duration: 36, sets: 11, note: "Heavy · DL 90×5" },
+    { date: "Apr 4",  day: "Sat", plan: "A", duration: 40, sets: 11, note: null },
+  ];
+
+  const NEXT = {
+    plan: "B",
+    name: "Workout B",
+    exercises: 7,
+    deadMode: "technique",
+    deadWeight: 70,
+    deadFrom: 95,
+    exList: [
+      { name: "Deadlift (Barbell)", spec: "2×3–5" },
+      { name: "Shoulder Press", spec: "2×5–8" },
+      { name: "Lat Pulldown", spec: "2×5–8" },
+      { name: "Seated Row", spec: "2×6–10" },
+      { name: "Bicep Curl (DB)", spec: "2×8–12" },
+      { name: "Lateral Raise", spec: "2×10–15" },
+      { name: "Hanging Leg Raises", spec: "2×8–15" },
+    ],
+  };
+
+  // ═══════ V1 — Focus ═══════
+  function v1(inProgress) {
+    return `
+      <div class="phone v1">
+        <div class="logo">IronLog</div>
+        <div class="today">Sun · Apr 19</div>
+
+        ${inProgress ? `
+        <div class="resume">
+          <div>
+            <div class="title">Workout in progress</div>
+            <div class="sub">Workout B · 3 / 14 sets · started 14:02</div>
+          </div>
+          <div style="color:var(--ok); font-size:22px;">›</div>
+        </div>` : ''}
+
+        <div class="hero">
+          <div class="label">NEXT UP</div>
+          <div class="big">B</div>
+          <div class="sub">Workout B · 7 exercises</div>
+          <div class="dead">
+            <div class="d1">TECHNIQUE DAY</div>
+            <div class="d2">Deadlift 2 × 3–5 @ 70 kg — 75 % of last heavy</div>
+          </div>
+          <div class="start">START WORKOUT B</div>
+        </div>
+
+        <div class="recent-lbl">LAST 5 SESSIONS</div>
+        <div class="recent-strip">
+          ${PAST.map(p => `<div class="dot ${p.plan.toLowerCase()}">${p.plan}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ═══════ V2 — Journal ═══════
+  function v2(inProgress) {
+    return `
+      <div class="phone v2">
+        <div class="logo">IronLog</div>
+        <div class="today">Sun · Apr 19</div>
+
+        <div class="journal">
+          ${inProgress ? `
+          <div class="entry inprog">
+            <div class="date">IN PROGRESS · started 14:02</div>
+            <div class="row1">
+              <div class="name">Workout B (resume)</div>
+              <div class="stats">3 / 14 sets</div>
+            </div>
+            <div class="resume-btn">RESUME ›</div>
+          </div>` : ''}
+
+          <div class="entry next">
+            <div class="date">TODAY · NEXT UP</div>
+            <div class="row1">
+              <div class="name">Workout B</div>
+              <div class="stats">7 exercises</div>
+            </div>
+            <div class="note">Technique Day · Deadlift 2×3–5 @ 70 kg</div>
+            <div class="start-btn">START</div>
+          </div>
+
+          ${PAST.map(p => `
+            <div class="entry">
+              <div class="date">${p.day} · ${p.date}</div>
+              <div class="row1">
+                <div class="name">Workout ${p.plan}</div>
+                <div class="stats">${p.duration} min · ${p.sets} sets</div>
+              </div>
+              ${p.note ? `<div class="note">${p.note}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ═══════ V3 — Timeline ═══════
+  function v3(inProgress) {
+    return `
+      <div class="phone v3">
+        <div class="logo">IronLog</div>
+        <div class="today">Sun · Apr 19</div>
+
+        <div class="timeline">
+          ${PAST.slice().reverse().map(p => `
+            <div class="tl ${p.plan.toLowerCase()}">
+              <div class="date">${p.date}</div>
+              <div class="plan">${p.plan}</div>
+              <div class="stats">${p.duration}m · ${p.sets}s</div>
+            </div>
+          `).join('')}
+          ${inProgress ? `
+          <div class="tl inprog">
+            <div class="date">NOW</div>
+            <div class="plan" style="color:var(--ok)">B</div>
+            <div class="stats">resume</div>
+          </div>` : `
+          <div class="tl next b">
+            <div class="label">TODAY</div>
+            <div class="plan">B</div>
+            <div class="stats">tap to start</div>
+          </div>`}
+        </div>
+
+        <div class="detail">
+          <div class="label">NEXT UP</div>
+          <div class="title">Workout B</div>
+          <div class="mode">
+            <div>
+              <div class="m1">TECHNIQUE DAY</div>
+              <div class="m2">Deadlift 2 × 3–5 @ 70 kg (75 % of 95)</div>
+            </div>
+          </div>
+          <div class="exlist">
+            Deadlift · Shoulder Press · Lat Pulldown ·<br>
+            Seated Row · Bicep Curl · Lateral Raise · Hanging Leg Raises
+          </div>
+          <div class="start">START WORKOUT B</div>
+        </div>
+      </div>`;
+  }
+
+  // ═══════ V4 — Split (rich card + recent list) ═══════
+  function v4(inProgress) {
+    return `
+      <div class="phone v4">
+        <div class="logo">IronLog</div>
+        <div class="today">Sun · Apr 19</div>
+
+        ${inProgress ? `
+        <div class="resume" style="background:var(--ok-tint); border:1px solid rgba(76,175,80,.4); padding:10px 12px; border-radius:10px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; font-weight:800; color:var(--ok)">Workout in progress</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">Workout B · 3 / 14 sets</div>
+          </div>
+          <div style="color:var(--ok); font-size:22px;">›</div>
+        </div>` : ''}
+
+        <div class="next-card">
+          <div class="eyebrow">
+            <div class="label">NEXT UP</div>
+            <div class="letter">B</div>
+          </div>
+          <div class="name">Workout B</div>
+          <div class="meta">7 exercises · ~45 min</div>
+          <div class="dead-inline">
+            <div class="tag">TECH</div>
+            <div class="txt">Deadlift 2 × 3–5 @ 70 kg (75 % of 95)</div>
+          </div>
+          <div class="exlist">
+            ${NEXT.exList.map(e => `<div class="ex"><span class="n">${e.name}</span><span class="p">${e.spec}</span></div>`).join('')}
+          </div>
+          <div class="go">START WORKOUT B</div>
+        </div>
+
+        <div class="recent-sec">
+          <div class="sec-title">RECENT</div>
+          ${PAST.slice(0, 5).map(p => `
+            <div class="recent-row">
+              <div class="left">
+                <div class="chip ${p.plan.toLowerCase()}">${p.plan}</div>
+                <div>
+                  <div class="date">${p.day} · ${p.date}</div>
+                  ${p.note ? `<div style="font-size:10px; color:var(--mutedX); margin-top:1px;">${p.note}</div>` : ''}
+                </div>
+              </div>
+              <div class="stats">${p.duration}m · ${p.sets}s</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ═══════ V5 — Dashboard ═══════
+  function v5(inProgress) {
+    return `
+      <div class="phone v5">
+        <div class="logo">IronLog</div>
+        <div class="today">Sun · Apr 19</div>
+
+        <div class="stat-row">
+          <div class="stat"><div class="v">9</div><div class="l">sessions / 30d</div></div>
+          <div class="stat"><div class="v">12.4 t</div><div class="l">volume / 30d</div></div>
+          <div class="stat"><div class="v">3</div><div class="l">PRs · 30d</div></div>
+        </div>
+
+        ${inProgress ? `
+        <div style="background:var(--ok-tint); border:1px solid rgba(76,175,80,.4); padding:10px 12px; border-radius:10px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; font-weight:800; color:var(--ok)">Workout in progress</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px;">Workout B · 3 / 14 sets</div>
+          </div>
+          <div style="color:var(--ok); font-size:22px;">›</div>
+        </div>` : ''}
+
+        <div class="next">
+          <div class="head">
+            <div class="label">NEXT UP</div>
+            <div style="font-size:34px; font-weight:900; color:var(--accent); line-height:1;">B</div>
+          </div>
+          <div class="title">Workout B</div>
+          <div class="sub">7 exercises · last B was Apr 15 (heavy)</div>
+          <div class="mode">
+            <div class="k">TECH</div>
+            <div class="v">Deadlift 2 × 3–5 @ 70 kg (75 % of 95)</div>
+          </div>
+          <div class="start">START WORKOUT B</div>
+        </div>
+
+        <div class="minihistory">
+          <div class="ttl">LATEST</div>
+          ${PAST.slice(0, 4).map(p => `
+            <div class="row">
+              <div class="c">
+                <div class="badge ${p.plan.toLowerCase()}">${p.plan}</div>
+                <div>
+                  <div class="date">${p.day} · ${p.date}</div>
+                  ${p.note ? `<div style="font-size:10px; color:var(--mutedX);">${p.note}</div>` : ''}
+                </div>
+              </div>
+              <div class="stat">${p.duration}m · ${p.sets}s</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  const VARIATIONS = [
+    {
+      title: "Focus — big Start, history minimal",
+      sub: "letter-only hero · 5 past sessions as dots",
+      make: v1,
+      caption: "<b>One job: press Start.</b> Giant <code>B</code> letter, exercise count, deadlift mode badge, button. Past sessions collapse to colored dots at the bottom (A blue, B amber). Lowest chrome; highest 'just do the thing'."
+    },
+    {
+      title: "Journal — reverse-chronological feed",
+      sub: "today → yesterday → last week → ...",
+      make: v2,
+      caption: "<b>Training log style.</b> Today's up-next sits at the top as an entry with a big Start button; below it, the history feed in the same card format. Feels like flipping through a notebook. Best if you frequently glance back at what you did last session."
+    },
+    {
+      title: "Timeline — horizontal scroll",
+      sub: "past cards → today end-cap",
+      make: v3,
+      caption: "<b>Time as space.</b> Top strip is a horizontal timeline: scroll left for older, the rightmost card is today (tappable to start). Below, a compact detail card for the selected day. Good spatial intuition, but horizontal scroll needs discovery."
+    },
+    {
+      title: "Split — rich next card + recent list",
+      sub: "exercises listed inline, recent below",
+      make: v4,
+      caption: "<b>Full preview.</b> Next workout shows all 7 exercises with their prescriptions inline, so you know what you're in for before starting. Recent sessions as a compact list underneath. Longest screen (scrolling required)."
+    },
+    {
+      title: "Dashboard — stats-first",
+      sub: "30-day stats top, next in middle, history bottom",
+      make: v5,
+      caption: "<b>Motivation through numbers.</b> Top shows 30-day stats (sessions, volume, PRs). Then the next-up card, then 4 recent sessions. Useful if you care about trends; adds a beat before the Start button."
+    },
+  ];
+
+  document.getElementById('gallery').innerHTML = VARIATIONS.map((v, i) => `
+    <div class="wrap">
+      <div class="wrap-hdr">
+        <div class="idx">V${String(i + 1).padStart(2, '0')}</div>
+        <div class="wrap-title">${v.title}</div>
+        <div class="wrap-sub">${v.sub}</div>
+      </div>
+      ${v.make(false)}
+      <div class="wrap-cap">${v.caption}</div>
+    </div>
+  `).join('') +
+  // Also show the "in progress" state for a couple of layouts so user sees resume behaviour
+  `<div class="wrap">
+    <div class="wrap-hdr">
+      <div class="idx">V01 · IN PROGRESS</div>
+      <div class="wrap-title">Focus — with resume banner</div>
+      <div class="wrap-sub">same layout, shown when a workout is mid-flight</div>
+    </div>
+    ${v1(true)}
+    <div class="wrap-cap">Same Focus layout as V01, now with a green <b>Workout in progress</b> banner sitting above the hero. Tapping it jumps straight back to the active session, preserving context.</div>
+  </div>
+  <div class="wrap">
+    <div class="wrap-hdr">
+      <div class="idx">V04 · IN PROGRESS</div>
+      <div class="wrap-title">Split — with resume banner</div>
+      <div class="wrap-sub">same layout, shown when a workout is mid-flight</div>
+    </div>
+    ${v4(true)}
+    <div class="wrap-cap">Resume banner at the top of V04 — keeps full next-up detail visible below so you can still scan exercises if you decide to discard and restart.</div>
+  </div>`;
+</script>
+</body>
+</html>

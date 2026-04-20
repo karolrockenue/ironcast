@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IronLog — App Icon Concepts</title>
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --surface: #1A1A1A;
+    --border: #333333;
+    --text: #F5F5F5;
+    --muted: #999999;
+    --accent: #4A90D9;
+    --accent-2: #6AA8E8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 14px; letter-spacing: 3px; color: var(--muted); font-weight: 800; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 32px; }
+  .concept { background: transparent; }
+  .icon-box { width: 100%; aspect-ratio: 1/1; border-radius: 22.37%; overflow: hidden; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .meta { margin-top: 14px; }
+  .title { font-size: 13px; font-weight: 800; letter-spacing: 2px; color: var(--text); }
+  .desc  { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  /* 1. Stacked Brutalist — IRON/LOG wordmark */
+  .c1 { background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
+  .c1 .line { font-family: Impact, "Arial Narrow", "Helvetica Neue Condensed", sans-serif; font-weight: 900; font-size: 38%; letter-spacing: 4px; line-height: 0.95; }
+  .c1 .iron { color: var(--text); }
+  .c1 .log  { color: var(--accent); }
+  .c1 .bar  { width: 22%; height: 5%; background: var(--accent); margin-top: 6%; }
+
+  /* 2. IL Monogram — slab initials framed */
+  .c2 { background: var(--accent); display: flex; align-items: center; justify-content: center; position: relative; }
+  .c2 .mono { font-family: Impact, "Arial Narrow", sans-serif; font-weight: 900; color: var(--bg); font-size: 58%; letter-spacing: -2px; line-height: 1; }
+  .c2 .corner { position: absolute; inset: 8%; border: 4px solid var(--bg); pointer-events: none; }
+
+  /* 3. Dumbbell — geometric */
+  .c3 { background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .c3 svg { width: 66%; height: auto; }
+
+  /* 4. A / B split — typographic block */
+  .c4 { background: var(--bg); position: relative; }
+  .c4 .half { position: absolute; width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; font-family: Impact, "Arial Narrow", sans-serif; font-weight: 900; font-size: 62%; letter-spacing: -2px; }
+  .c4 .a { left: 0; color: var(--text); }
+  .c4 .b { right: 0; color: var(--bg); background: var(--accent); }
+
+  /* 5. Plate edge — concentric */
+  .c5 { background: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .c5 svg { width: 74%; height: auto; }
+
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>IRONLOG · APP ICON CONCEPTS</h1>
+  <div class="sub">5 directions. Each preview is rendered inside the rounded square used by iOS.</div>
+
+  <div class="grid">
+
+    <!-- 1. Stacked Brutalist -->
+    <div class="concept">
+      <div class="icon-box c1">
+        <div class="line iron">IRON</div>
+        <div class="line log">LOG</div>
+        <div class="bar"></div>
+      </div>
+      <div class="meta">
+        <div class="title">01 · STACKED BRUTALIST</div>
+        <div class="desc">Matches the splash screen — IRON white, LOG accent, divider bar. Most "branded", strongest identity carry-over.</div>
+      </div>
+    </div>
+
+    <!-- 2. IL Monogram -->
+    <div class="concept">
+      <div class="icon-box c2">
+        <div class="mono">IL</div>
+        <div class="corner"></div>
+      </div>
+      <div class="meta">
+        <div class="title">02 · IL MONOGRAM</div>
+        <div class="desc">Inverts the palette — accent fill, bg letterforms, hairline frame. Reads at thumbnail size. Feels premium/minimal.</div>
+      </div>
+    </div>
+
+    <!-- 3. Dumbbell geometric -->
+    <div class="concept">
+      <div class="icon-box c3">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <!-- handle -->
+          <rect x="30" y="47" width="40" height="6" fill="#4A90D9"/>
+          <!-- inner plates -->
+          <rect x="22" y="38" width="10" height="24" fill="#4A90D9"/>
+          <rect x="68" y="38" width="10" height="24" fill="#4A90D9"/>
+          <!-- outer plates -->
+          <rect x="14" y="30" width="10" height="40" fill="#4A90D9"/>
+          <rect x="76" y="30" width="10" height="40" fill="#4A90D9"/>
+        </svg>
+      </div>
+      <div class="meta">
+        <div class="title">03 · DUMBBELL MARK</div>
+        <div class="desc">Instantly category-legible. Geometric, centered, flat accent on dark. Reads even at the smallest iOS icon size.</div>
+      </div>
+    </div>
+
+    <!-- 4. A/B Split -->
+    <div class="concept">
+      <div class="icon-box c4">
+        <div class="half a">A</div>
+        <div class="half b">B</div>
+      </div>
+      <div class="meta">
+        <div class="title">04 · A / B SPLIT</div>
+        <div class="desc">Leans into the app's core concept — strict alternation. Half-and-half typographic block. Bold, memorable, unusual.</div>
+      </div>
+    </div>
+
+    <!-- 5. Plate edge concentric -->
+    <div class="concept">
+      <div class="icon-box c5">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="#0D0D0D" stroke-width="6"/>
+          <circle cx="50" cy="50" r="30" fill="none" stroke="#0D0D0D" stroke-width="6"/>
+          <circle cx="50" cy="50" r="6" fill="#0D0D0D"/>
+        </svg>
+      </div>
+      <div class="meta">
+        <div class="title">05 · PLATE EDGE</div>
+        <div class="desc">Weight plate, edge-on. Concentric rings on accent. Most literal — symbolizes the lift itself. Very clean.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

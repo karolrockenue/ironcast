@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — active / done states</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg:        #0D0D0D;
+    --surface:   #1A1A1A;
+    --surface2:  #252525;
+    --surface3:  #2F2F2F;
+    --border:    #333;
+    --text:      #F5F5F5;
+    --muted:     #999;
+    --mutedX:    #666;
+    --accent:    #4A90D9;
+    --accent2:   #6AA8E8;
+    --accent-tint: rgba(74,144,217,.14);
+    --accent-band: rgba(74,144,217,.20);
+    --warn:      #FFA726;
+    --warn-tint: rgba(255,167,38,.18);
+    --ok:        #4CAF50;
+    --ok-tint:   rgba(76,175,80,.22);
+    --danger:    #E05555;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 440px; margin: 0 auto;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+
+  /* ─── Top bar ────────────────────────────────────── */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .elapsed { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .topbar .progress { color: var(--muted); font-size: 13px; font-weight: 700; }
+
+  /* ─── Exercise card ──────────────────────────────── */
+  .stack { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+  .ex {
+    border-radius: 14px; padding: 14px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+    transition: background .2s, border-color .2s, opacity .2s;
+  }
+
+  /* States */
+  .ex.pending {
+    opacity: .55;
+    cursor: pointer;
+  }
+  .ex.active {
+    border-color: rgba(74,144,217,.4);
+    background: linear-gradient(180deg, rgba(74,144,217,.08), var(--surface) 60%);
+  }
+  .ex.done {
+    background: rgba(76,175,80,.06);
+    border-color: rgba(76,175,80,.3);
+  }
+
+  .ex-hdr {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px;
+  }
+  .ex-title-wrap { flex: 1; min-width: 0; }
+  .ex-name { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .ex-name .check {
+    color: var(--ok); font-size: 18px; font-weight: 900;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 11px;
+    background: rgba(76,175,80,.18);
+  }
+  .ex-name .dot-active {
+    width: 8px; height: 8px; border-radius: 4px; background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74,144,217,.22);
+  }
+  .ex-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .pill {
+    display: inline-block; padding: 3px 9px; border-radius: 7px;
+    font-size: 11px; font-weight: 800; letter-spacing: .5px;
+    background: var(--accent-tint); color: var(--accent);
+    white-space: nowrap;
+  }
+  .pill.done { background: rgba(76,175,80,.18); color: var(--ok); }
+  .pill.pending { background: var(--surface2); color: var(--muted); }
+
+  /* Active — set rows */
+  .sets-wrap {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(255,255,255,.06);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 28px 96px 1fr 28px;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+  }
+  .set-row:last-child { border-bottom: 0; }
+
+  /* Highlighted current (next-to-log) set */
+  .set-row.current {
+    background: linear-gradient(90deg, rgba(74,144,217,.1), transparent);
+    border-radius: 8px;
+    margin: 0 -6px;
+    padding: 10px 6px;
+    border-bottom: 0;
+  }
+
+  .set-n {
+    font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: 1.5px;
+  }
+  .set-row.current .set-n { color: var(--accent); }
+  .set-row.logged  .set-n { color: var(--ok); }
+
+  /* Stepper */
+  .stepper {
+    display: inline-flex; align-items: center;
+    background: var(--surface2); border-radius: 8px; overflow: hidden;
+    height: 32px;
+  }
+  .stepper button {
+    width: 28px; height: 32px; border: 0; background: transparent;
+    color: var(--text); font-weight: 700; font-size: 14px; cursor: pointer;
+    padding: 0;
+  }
+  .stepper button:hover { background: rgba(255,255,255,.05); }
+  .stepper .val {
+    padding: 0 4px; font-size: 13px; font-weight: 800;
+    font-variant-numeric: tabular-nums; min-width: 34px; text-align: center;
+  }
+  .stepper .unit {
+    font-size: 9px; color: var(--muted); letter-spacing: .5px;
+    padding-right: 6px;
+  }
+
+  /* Slider */
+  .slider {
+    position: relative;
+    height: 32px;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .slider .track {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden;
+  }
+  .slider .band { position: absolute; top: 0; bottom: 0; background: var(--accent-band); }
+  .slider .band::before, .slider .band::after {
+    content: ""; position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--accent); opacity: .55; border-radius: 1px;
+  }
+  .slider .band::before { left: 0; }
+  .slider .band::after  { right: 0; }
+  .slider .thumb {
+    position: absolute; top: 50%; width: 20px; height: 20px; border-radius: 11px;
+    background: var(--accent); transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(74,144,217,.22);
+  }
+  .slider.ok   .thumb { background: var(--ok);    box-shadow: 0 0 0 4px rgba(76,175,80,.28); }
+  .slider.push .thumb { background: var(--accent); box-shadow: 0 0 0 4px rgba(74,144,217,.28); }
+  .slider.low  .thumb { background: var(--warn);  box-shadow: 0 0 0 4px rgba(255,167,38,.28); }
+  .slider.empty .thumb { display: none; }
+  .slider.empty .hint {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 10px; color: var(--mutedX); letter-spacing: .5px;
+    pointer-events: none;
+  }
+
+  .reps-val {
+    font-size: 15px; font-weight: 800;
+    font-variant-numeric: tabular-nums; text-align: right;
+  }
+  .reps-val.muted { color: var(--muted); }
+  .reps-val.ok   { color: var(--ok); }
+  .reps-val.push { color: var(--accent); }
+  .reps-val.low  { color: var(--warn); }
+
+  /* Done summary chips */
+  .done-summary {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .rep-chip {
+    font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    background: rgba(76,175,80,.16); color: var(--ok);
+  }
+  .rep-chip.push { background: rgba(74,144,217,.16); color: var(--accent); }
+  .rep-chip.low  { background: rgba(255,167,38,.16); color: var(--warn); }
+
+  /* Exercise footer (active only) */
+  .ex-foot {
+    display: flex; gap: 8px; margin-top: 10px;
+    padding-top: 8px; border-top: 1px solid rgba(255,255,255,.04);
+  }
+  .ex-foot button {
+    flex: 1; padding: 9px; border: 0; border-radius: 9px; cursor: pointer;
+    font-size: 12px; font-weight: 700;
+    background: var(--surface2); color: var(--muted);
+  }
+  .ex-foot button.primary {
+    background: var(--ok); color: #fff; font-weight: 800;
+  }
+  .ex-foot button.primary[disabled] {
+    background: var(--surface2); color: var(--mutedX); cursor: default;
+  }
+
+  /* Bottom bar */
+  .bottom {
+    display: flex; gap: 10px; padding: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .bottom button {
+    flex: 1; padding: 14px; border: 0; border-radius: 12px; cursor: pointer;
+    font-size: 14px; font-weight: 800;
+  }
+  .bottom .discard { background: var(--surface); color: var(--danger); flex: 0 0 120px; }
+  .bottom .finish  { background: var(--ok); color: #fff; }
+
+  /* Notes sidebar (explanatory — only in mockup) */
+  .notes {
+    max-width: 440px; margin: 30px auto 0;
+    padding: 20px 24px 32px; color: var(--muted); font-size: 13px; line-height: 1.55;
+    border-top: 1px solid var(--border);
+  }
+  .notes h2 { color: var(--text); font-size: 15px; margin: 20px 0 8px; letter-spacing: .5px; }
+  .notes code { background: var(--surface); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: var(--text); }
+  .notes ul { padding-left: 18px; margin: 6px 0 10px; }
+  .notes li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="topbar">
+    <div class="elapsed">14:02</div>
+    <div class="progress" id="progressLabel">—</div>
+  </div>
+
+  <div class="stack" id="stack"></div>
+
+  <div class="bottom">
+    <button class="discard">Discard</button>
+    <button class="finish">Finish</button>
+  </div>
+</div>
+
+<div class="notes">
+  <h2>States visible here</h2>
+  <ul>
+    <li><b>Done</b> — green tint, checkmark, set results inline as chips.
+        Card is collapsed, not interactive.</li>
+    <li><b>Active</b> — accent border + faint blue gradient. Sets expanded.
+        The first unlogged set is highlighted as <b>current</b>. Drag its slider to log.</li>
+    <li><b>Pending</b> — dimmed. Tap to jump there (if you want to reorder on the fly).
+        Otherwise the app auto-advances when the active exercise is fully logged.</li>
+  </ul>
+  <h2>Try it</h2>
+  <ul>
+    <li>Drag the <b>Lat Pulldown</b> Set 2 slider — the set row flips to “logged”.
+        Log both sets in-range and the card auto-transitions to <b>done</b>,
+        and <b>Seated Cable Row</b> becomes active.</li>
+    <li>Tap any pending card to manually activate it instead.</li>
+    <li>The <code>Mark done</code> button in the active card lets you skip remaining sets
+        (e.g. if the rack is taken) without losing the ones you did.</li>
+  </ul>
+</div>
+
+<script>
+  /* ────────────────────────────────────────────────
+     Data model — the mockup is faithful to the real app:
+     each exercise has prescription + per-set logs.
+     ──────────────────────────────────────────────── */
+  const state = {
+    exercises: [
+      {
+        id: 1, name: "Machine Bench Press",
+        kg: 60, min: 6, max: 10, sets: 2,
+        lastReps: 9,
+        log: [10, 9],   // both logged → done
+      },
+      {
+        id: 2, name: "Lat Pulldown",
+        kg: 60, min: 6, max: 10, sets: 2,
+        lastReps: 8,
+        log: [8, null], // one logged, one pending → active
+      },
+      {
+        id: 3, name: "Seated Cable Row",
+        kg: 55, min: 8, max: 12, sets: 2,
+        lastReps: 10,
+        log: [null, null], // pending
+      },
+      {
+        id: 4, name: "Hack Squat",
+        kg: 100, min: 8, max: 12, sets: 3,
+        lastReps: 9,
+        log: [null, null, null], // pending
+      },
+    ],
+    manualActive: null, // null = auto-pick first incomplete; number = explicit override
+  };
+
+  /* Derived helpers */
+  const ABS_MAX = 20;
+  const inRange   = (ex, r) => r >= ex.min && r <= ex.max;
+  const stateFor  = (ex, r) => r == null ? null :
+    r >= ex.max ? 'push' : r >= ex.min ? 'ok' : 'low';
+  const pct       = (n) => ((n - 1) / (ABS_MAX - 1)) * 100;
+  const allLogged = (ex) => ex.log.every(r => r != null);
+  const firstIncompleteIdx = () => state.exercises.findIndex(e => !allLogged(e));
+
+  function activeIdx() {
+    if (state.manualActive != null) {
+      const i = state.exercises.findIndex(e => e.id === state.manualActive);
+      if (i !== -1 && !allLogged(state.exercises[i])) return i;
+    }
+    return firstIncompleteIdx();
+  }
+
+  /* ────────────────────────────────────────────────
+     Rendering
+     ──────────────────────────────────────────────── */
+  function render() {
+    const stack = document.getElementById('stack');
+    const aIdx = activeIdx();
+    stack.innerHTML = state.exercises.map((ex, i) => {
+      const isActive = i === aIdx;
+      const isDone   = allLogged(ex);
+      if (isDone) return renderDone(ex);
+      if (isActive) return renderActive(ex);
+      return renderPending(ex);
+    }).join('');
+
+    // Update header progress
+    const totalSets = state.exercises.reduce((s, e) => s + e.sets, 0);
+    const loggedSets = state.exercises.reduce((s, e) => s + e.log.filter(r => r != null).length, 0);
+    document.getElementById('progressLabel').textContent = `${loggedSets} / ${totalSets} sets`;
+
+    attachHandlers();
+  }
+
+  function renderDone(ex) {
+    const chips = ex.log.map(r => {
+      const st = stateFor(ex, r);
+      return `<span class="rep-chip ${st !== 'ok' ? st : ''}">${r}</span>`;
+    }).join('');
+    return `
+      <div class="ex done" data-id="${ex.id}">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">
+              <span class="check">✓</span>
+              ${ex.name}
+            </div>
+            <div class="ex-sub">${ex.sets} sets · ${ex.kg} kg</div>
+          </div>
+          <span class="pill done">DONE</span>
+        </div>
+        <div class="done-summary">${chips}</div>
+      </div>`;
+  }
+
+  function renderPending(ex) {
+    return `
+      <div class="ex pending" data-id="${ex.id}">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-sub">${ex.sets} sets · target ${ex.min}–${ex.max} · last ${ex.lastReps}</div>
+          </div>
+          <span class="pill pending">${ex.min}–${ex.max}</span>
+        </div>
+      </div>`;
+  }
+
+  function renderActive(ex) {
+    const loPct = pct(ex.min), hiPct = pct(ex.max);
+    // current = first empty set
+    const currentSet = ex.log.findIndex(r => r == null);
+    let rows = '';
+    ex.log.forEach((r, idx) => {
+      const st = stateFor(ex, r);
+      const thumbPct = r == null ? null : pct(r);
+      const isCurrent = idx === currentSet;
+      const rowClass = r != null ? 'logged' : isCurrent ? 'current' : 'empty';
+      rows += `
+        <div class="set-row ${rowClass}" data-set-idx="${idx}">
+          <div class="set-n">SET ${idx + 1}</div>
+          <div class="stepper">
+            <button data-act="kg-dec">−</button>
+            <span class="val">${ex.kg}</span>
+            <span class="unit">kg</span>
+            <button data-act="kg-inc">＋</button>
+          </div>
+          <div class="slider ${st || 'empty'}" data-slider="${idx}">
+            <div class="track">
+              <div class="band" style="left:${loPct}%; width:${hiPct - loPct}%"></div>
+            </div>
+            ${thumbPct == null
+              ? `<span class="hint">drag to log reps</span>`
+              : `<div class="thumb" style="left:${thumbPct}%"></div>`}
+          </div>
+          <div class="reps-val ${st || 'muted'}">${r ?? '—'}</div>
+        </div>`;
+    });
+
+    const allLoggedNow = ex.log.every(r => r != null);
+
+    return `
+      <div class="ex active" data-id="${ex.id}">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">
+              <span class="dot-active"></span>
+              ${ex.name}
+            </div>
+            <div class="ex-sub">${ex.sets} sets · last time ${ex.kg}kg × ${ex.lastReps}</div>
+          </div>
+          <span class="pill">TARGET ${ex.min}–${ex.max}</span>
+        </div>
+        <div class="sets-wrap">${rows}</div>
+        <div class="ex-foot">
+          <button data-act="markdone" ${allLoggedNow ? 'disabled' : ''}>
+            ${allLoggedNow ? 'All sets done' : 'Mark done early'}
+          </button>
+          <button class="primary" data-act="next" ${!allLoggedNow ? 'disabled' : ''}>
+            ${allLoggedNow ? 'Next exercise →' : 'Log all sets first'}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  /* ────────────────────────────────────────────────
+     Interactions
+     ──────────────────────────────────────────────── */
+  function attachHandlers() {
+    // Pending card tap → manually activate
+    document.querySelectorAll('.ex.pending').forEach(el => {
+      el.addEventListener('click', () => {
+        state.manualActive = Number(el.dataset.id);
+        render();
+      });
+    });
+
+    // Stepper buttons (adjust kg)
+    document.querySelectorAll('.stepper button').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const ex = state.exercises[activeIdx()];
+        const delta = btn.dataset.act === 'kg-inc' ? 2.5 : -2.5;
+        ex.kg = Math.max(0, +(ex.kg + delta).toFixed(2));
+        render();
+      });
+    });
+
+    // Footer buttons
+    document.querySelectorAll('[data-act="markdone"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const ex = state.exercises[activeIdx()];
+        // Fill any remaining sets with 0 so the card is "done" but you keep what you did
+        ex.log = ex.log.map(r => r == null ? 0 : r);
+        state.manualActive = null;
+        render();
+      });
+    });
+    document.querySelectorAll('[data-act="next"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        state.manualActive = null; // let auto-advance pick the next incomplete
+        render();
+      });
+    });
+
+    // Sliders
+    document.querySelectorAll('.slider[data-slider]').forEach(sl => {
+      const setIdx = Number(sl.dataset.slider);
+      let dragging = false;
+
+      const getPct = (evt) => {
+        const r = sl.getBoundingClientRect();
+        const x = (evt.touches ? evt.touches[0].clientX : evt.clientX) - r.left;
+        return Math.max(0, Math.min(100, (x / r.width) * 100));
+      };
+      const commit = (p) => {
+        const n = Math.round((p / 100) * (ABS_MAX - 1)) + 1;
+        const ex = state.exercises[activeIdx()];
+        ex.log[setIdx] = n;
+        // If this was the last pending set, drop the manual override so
+        // auto-advance picks the real next exercise.
+        if (ex.log.every(r => r != null)) state.manualActive = null;
+        render();
+      };
+      sl.addEventListener('mousedown', e => { dragging = true; commit(getPct(e)); });
+      window.addEventListener('mousemove', e => { if (dragging) commit(getPct(e)); });
+      window.addEventListener('mouseup', () => { dragging = false; });
+      sl.addEventListener('touchstart', e => {
+        dragging = true; commit(getPct(e)); e.preventDefault();
+      }, { passive: false });
+      sl.addEventListener('touchmove', e => {
+        if (dragging) { commit(getPct(e)); e.preventDefault(); }
+      }, { passive: false });
+      sl.addEventListener('touchend', () => { dragging = false; });
+    });
+  }
+
+  render();
+</script>
+</body>
+</html>

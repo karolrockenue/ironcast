@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — baseline + 5 slight variations</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg:          #0D0D0D;
+    --surface:     #1A1A1A;
+    --surface2:    #252525;
+    --border:      #333;
+    --divider:     rgba(255,255,255,.05);
+    --text:        #F5F5F5;
+    --muted:       #999;
+    --mutedX:      #666;
+    --accent:      #4A90D9;
+    --accent-tint: rgba(74,144,217,.14);
+    --accent-band: rgba(74,144,217,.20);
+    --accent-soft: rgba(74,144,217,.06);
+    --warn:        #FFA726;
+    --warn-tint:   rgba(255,167,38,.18);
+    --ok:          #4CAF50;
+    --ok-tint:     rgba(76,175,80,.22);
+    --danger:      #E05555;
+    --danger-tint: rgba(224,85,85,.20);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #080808;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 32px 28px 12px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; color: #fff; }
+  .lede {
+    color: #999; font-size: 14px; margin-top: 6px; max-width: 780px; line-height: 1.5;
+  }
+  .lede b { color: #fff; font-weight: 700; }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 22px;
+    padding: 24px 28px 60px;
+    max-width: 1600px; margin: 0 auto;
+  }
+  .wrap { display: flex; flex-direction: column; }
+  .wrap-hdr {
+    background: #161616; border-radius: 14px 14px 0 0; padding: 14px 16px;
+    border: 1px solid #222; border-bottom: 0;
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+  }
+  .idx { font-size: 11px; letter-spacing: 2px; color: #777; font-weight: 700; }
+  .wrap-title { font-size: 16px; font-weight: 800; margin-top: 4px; color: #fff; }
+  .wrap-sub   { font-size: 12px; color: #999; margin-top: 2px; }
+  .wrap-cap {
+    background: #161616; border-radius: 0 0 14px 14px; padding: 12px 16px 14px;
+    font-size: 12px; color: #bbb; line-height: 1.5;
+    border: 1px solid #222; border-top: 0;
+  }
+  .wrap-cap b { color: #fff; font-weight: 700; }
+
+  /* ═══════ Phone shell ═══════ */
+  .phone {
+    background: var(--bg);
+    padding: 10px 10px 0;
+    border-left: 1px solid #222; border-right: 1px solid #222;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .elapsed { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .topbar .progress { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .stack { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 12px; }
+
+  /* ═══════ Baseline exercise card ═══════ */
+  .ex {
+    border-radius: 12px;
+    padding: 12px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+  }
+  .ex.done {
+    background: rgba(76,175,80,.06);
+    border-color: rgba(76,175,80,.28);
+  }
+  .ex.active {
+    background: linear-gradient(180deg, rgba(74,144,217,.08), var(--surface) 60%);
+    border-color: rgba(74,144,217,.4);
+  }
+  .ex.pending { opacity: .55; }
+
+  .ex-hdr {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  }
+  .ex-title-wrap { flex: 1; min-width: 0; }
+  .ex-name {
+    font-size: 16px; font-weight: 800;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ex-name .check {
+    width: 20px; height: 20px; border-radius: 10px;
+    background: var(--ok-tint); color: var(--ok);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 900;
+  }
+  .ex-name .dot-active {
+    width: 8px; height: 8px; border-radius: 4px;
+    background: var(--accent); box-shadow: 0 0 0 3px rgba(74,144,217,.22);
+  }
+  .ex-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .pill {
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 800; letter-spacing: .5px;
+    background: var(--accent-tint); color: var(--accent);
+    white-space: nowrap;
+  }
+  .pill.done    { background: var(--ok-tint); color: var(--ok); }
+  .pill.pending { background: var(--surface2); color: var(--muted); }
+
+  /* Done card — chips summary */
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: var(--ok-tint); color: var(--ok);
+  }
+
+  /* Coach line */
+  .coach {
+    border-left: 3px solid var(--accent);
+    padding: 4px 10px;
+    margin-top: 8px;
+    font-size: 12px; color: var(--accent); font-weight: 700;
+  }
+
+  /* Last-session block (above working sets) */
+  .last-sess {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider);
+  }
+  .last-sess-label {
+    font-size: 9px; letter-spacing: 1.5px; font-weight: 800;
+    color: var(--mutedX); margin-bottom: 3px;
+  }
+  .last-sess-row {
+    font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    margin-top: 1px;
+  }
+
+  /* Working sets */
+  .sets-wrap {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider);
+  }
+  .set {
+    display: grid;
+    /* SET | KG (narrower) | REPS (flex) | LOG */
+    grid-template-columns: 42px 108px 1fr 50px;
+    gap: 6px; align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--divider);
+  }
+  .set:last-child { border-bottom: 0; }
+  .set.current {
+    background: var(--accent-soft);
+    margin: 0 -4px;
+    padding: 7px 4px;
+    border-radius: 6px;
+    border-bottom: 0;
+  }
+  .set-n {
+    font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+    color: var(--mutedX);
+  }
+  .set.current .set-n { color: var(--accent); }
+  .set.logged .set-n  { color: var(--ok); }
+
+  /* Stepper */
+  .stp {
+    display: flex; align-items: center;
+    background: var(--surface2);
+    border-radius: 8px; overflow: hidden;
+    height: 36px; min-width: 0;
+  }
+  .stp .b {
+    width: 26px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); font-weight: 800; font-size: 15px;
+  }
+  .stp .v {
+    flex: 1; text-align: center; color: var(--text);
+    font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;
+    padding: 0 2px; min-width: 28px;
+  }
+  .stp .v.ph { color: var(--mutedX); font-weight: 700; }
+  .stp .u {
+    font-size: 9px; color: var(--muted); letter-spacing: .5px;
+    padding-right: 4px;
+  }
+  .stp.tint-ok   { background: rgba(76,175,80,.18); }
+  .stp.tint-push { background: rgba(74,144,217,.16); }
+  .stp.tint-red  { background: var(--danger-tint); }
+  .stp.tint-low  { background: var(--warn-tint); }
+  .stp.locked    { opacity: .65; }
+  .stp.locked .b { visibility: hidden; }
+
+  .log {
+    width: 50px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent); color: #fff;
+    font-weight: 900; font-size: 11px; letter-spacing: 1px;
+  }
+  .log.del      { background: rgba(224,85,85,.16); color: var(--danger); font-size: 18px; }
+  .log.disabled { background: var(--surface2); color: var(--mutedX); }
+
+  /* ════════════════════════════════════════════════════════
+     VARIATION-SPECIFIC OVERRIDES — the tiny differences
+     ════════════════════════════════════════════════════════ */
+
+  /* V2 — column headers */
+  .v2 .col-head {
+    display: grid;
+    grid-template-columns: 42px 108px 1fr 50px;
+    gap: 6px;
+    padding: 0 0 4px;
+    font-size: 9px; color: var(--mutedX); letter-spacing: 1.5px; font-weight: 800;
+  }
+  .v2 .col-head > span { text-align: center; }
+  .v2 .col-head > span:first-child { text-align: left; }
+  .v2 .sets-wrap { padding-top: 4px; }
+
+  /* V3 — emphasized current set */
+  .v3 .set.current {
+    background: rgba(74,144,217,.14);
+    border: 1px solid rgba(74,144,217,.35);
+    padding: 8px 6px;
+    margin: 2px -4px;
+  }
+  .v3 .set.current .set-n {
+    color: #fff; font-size: 11px;
+  }
+
+  /* V4 — inline last-session per row (no header block) */
+  .v4 .last-sess { display: none; }
+  .v4 .set .lastpx {
+    font-size: 10px; color: var(--mutedX);
+    font-variant-numeric: tabular-nums;
+    grid-column: 1 / -1;
+    margin-top: 2px;
+    padding-left: 48px;
+  }
+  .v4 .set {
+    grid-template-columns: 42px 108px 1fr 50px;
+    grid-auto-rows: auto;
+  }
+
+  /* V5 — tighter / denser */
+  .v5 .ex { padding: 10px 12px; }
+  .v5 .ex-name { font-size: 15px; }
+  .v5 .ex-sub { font-size: 10px; }
+  .v5 .coach { padding: 2px 10px; font-size: 11px; margin-top: 6px; }
+  .v5 .last-sess { margin-top: 8px; padding-top: 6px; }
+  .v5 .last-sess-row { font-size: 10px; }
+  .v5 .sets-wrap { margin-top: 8px; padding-top: 6px; }
+  .v5 .set { padding: 5px 0; }
+  .v5 .stp, .v5 .log { height: 32px; }
+  .v5 .stp .b { height: 32px; }
+
+  /* V6 — values right-aligned in steppers (like a calculator readout) */
+  .v6 .stp .v { text-align: right; padding-right: 8px; }
+  .v6 .stp .u { padding-right: 6px; }
+
+  /* ════════════════════════════════════════════════════════
+     V7 — "Combined" (V02 headers + V03 highlight + V04 inline fixed)
+     ════════════════════════════════════════════════════════ */
+
+  /* column headers row (from V2) */
+  .v7 .col-head {
+    display: grid;
+    grid-template-columns: 42px 108px 1fr 50px;
+    gap: 6px;
+    padding: 0 0 4px;
+    font-size: 9px; color: var(--mutedX); letter-spacing: 1.5px; font-weight: 800;
+  }
+  .v7 .col-head > span { text-align: center; }
+  .v7 .col-head > span:first-child { text-align: left; }
+  .v7 .sets-wrap { padding-top: 4px; }
+
+  /* each set row now has an optional second row for the last-session values,
+     placed under their own columns (kg under kg, reps under reps) */
+  .v7 .set {
+    grid-template-columns: 42px 108px 1fr 50px;
+    grid-auto-rows: auto;
+    row-gap: 3px;
+    padding: 7px 0 9px;
+  }
+  .v7 .set .last-kg,
+  .v7 .set .last-reps {
+    font-size: 10px;
+    color: var(--mutedX);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    letter-spacing: 0.3px;
+  }
+  .v7 .set .last-kg   { grid-column: 2; grid-row: 2; }
+  .v7 .set .last-reps { grid-column: 3; grid-row: 2; }
+
+  /* strong current-set highlight (from V3) */
+  .v7 .set.current {
+    background: rgba(74,144,217,.14);
+    border: 1px solid rgba(74,144,217,.35);
+    border-radius: 8px;
+    margin: 2px -4px;
+    padding: 8px 6px 10px;
+  }
+  .v7 .set.current .set-n {
+    color: #fff; font-size: 11px;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Baseline + 5 slight variations</h1>
+  <p class="lede">
+    Locked: minimal monochrome dark theme from <code>active-styles.html</code>, narrower
+    KG stepper (108&nbsp;px fixed), <b>LAST SESSION</b> block above the working sets.
+    Each card below keeps the exact same content — mid-Workout A with Lat Pulldown
+    active — and differs only in small refinements. Pick the one that reads cleanest.
+  </p>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+  // ─── Same card content for all variations ────────
+  function doneCard() {
+    return `
+      <div class="ex done">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="check">✓</span>Machine Bench Press</div>
+            <div class="ex-sub">2 sets · all logged</div>
+          </div>
+          <span class="pill done">DONE</span>
+        </div>
+        <div class="chips">
+          <span class="chip">55 × 8</span>
+          <span class="chip">50 × 5</span>
+        </div>
+      </div>`;
+  }
+  function pendingCard(name, meta, range) {
+    return `
+      <div class="ex pending">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">${name}</div>
+            <div class="ex-sub">${meta}</div>
+          </div>
+          <span class="pill pending">${range}</span>
+        </div>
+      </div>`;
+  }
+
+  // ─── Active card renderer — variation-aware ────────
+  function activeCard(variation) {
+    const header = `
+      <div class="ex-hdr">
+        <div class="ex-title-wrap">
+          <div class="ex-name"><span class="dot-active"></span>Lat Pulldown</div>
+          <div class="ex-sub">2 sets · target 5–8 reps</div>
+        </div>
+        <span class="pill">5–8</span>
+      </div>
+      <div class="coach">Below range — drop to 55 kg</div>`;
+
+    const lastSessionBlock = `
+      <div class="last-sess">
+        <div class="last-sess-label">LAST SESSION</div>
+        <div class="last-sess-row">Set 1 · 60 kg × 4</div>
+        <div class="last-sess-row">Set 2 · 55 kg × 6</div>
+      </div>`;
+
+    const columnHeaders = (variation === 2 || variation === 7) ? `
+      <div class="col-head">
+        <span>SET</span><span>WEIGHT</span><span>REPS</span><span></span>
+      </div>` : '';
+
+    // V4: single inline "last · 60 kg × 4" under the set (left-aligned strip)
+    // V7: two cells placed directly under the KG and REPS columns
+    const inlinePrev = (setNum, w, r) => {
+      if (variation === 4)
+        return `<div class="lastpx">last · ${w} kg × ${r}</div>`;
+      if (variation === 7)
+        return `<div class="last-kg">last · ${w} kg</div>
+                <div class="last-reps">last · ${r}</div>`;
+      return '';
+    };
+
+    const sets = `
+      <div class="sets-wrap">
+        ${columnHeaders}
+        <div class="set logged">
+          <div class="set-n">SET 1</div>
+          <div class="stp locked">
+            <span class="b">−</span><span class="v">55</span>
+            <span class="u">kg</span><span class="b">＋</span>
+          </div>
+          <div class="stp tint-ok locked">
+            <span class="b">−</span><span class="v">7</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="log del">×</div>
+          ${inlinePrev(1, 60, 4)}
+        </div>
+        <div class="set current">
+          <div class="set-n">SET 2</div>
+          <div class="stp">
+            <span class="b">−</span><span class="v">45</span>
+            <span class="u">kg</span><span class="b">＋</span>
+          </div>
+          <div class="stp">
+            <span class="b">−</span><span class="v ph">6</span>
+            <span class="b">＋</span>
+          </div>
+          <div class="log disabled">LOG</div>
+          ${inlinePrev(2, 55, 6)}
+        </div>
+      </div>`;
+
+    const showBlock = variation !== 4 && variation !== 7;
+    return `
+      <div class="ex active">
+        ${header}
+        ${showBlock ? lastSessionBlock : ''}
+        ${sets}
+      </div>`;
+  }
+
+  function phone(variation) {
+    const cls = `v${variation}`;
+    return `
+      <div class="phone ${cls}">
+        <div class="topbar">
+          <span class="elapsed">14:02</span>
+          <span class="progress">3 / 14 sets</span>
+        </div>
+        <div class="stack">
+          ${doneCard()}
+          ${activeCard(variation)}
+          ${pendingCard("Seated Row", "2 sets · last 60 kg × 8", "6–10")}
+          ${pendingCard("Bicep Curl", "2 sets · last 12 kg × 8", "8–12")}
+        </div>
+      </div>`;
+  }
+
+  const VARIATIONS = [
+    {
+      title: "Baseline",
+      sub: "the V1 from active-styles.html, verbatim",
+      caption: "<b>The reference.</b> Minimal monochrome. Block <code>LAST SESSION</code> label + two muted rows above the working sets. KG stepper 108 px, reps stepper flex. Current set has a soft accent tint."
+    },
+    {
+      title: "Column headers",
+      sub: "tiny SET · WEIGHT · REPS labels above",
+      caption: "<b>+</b> column headers row above the sets. More explicit; helps first-time users orient. Costs ~12&nbsp;px vertical space per exercise. Everything else identical to baseline."
+    },
+    {
+      title: "Stronger current highlight",
+      sub: "current set gets a visible border + darker tint",
+      caption: "<b>+</b> the current (about-to-log) set gets a 1 px accent border and stronger background tint. Easier to see which set you're working at a glance, especially when scrolling mid-workout."
+    },
+    {
+      title: "Inline last-session per row",
+      sub: "no block above — each set shows its own `last`",
+      caption: "<b>−</b> drop the <code>LAST SESSION</code> block. <b>+</b> each set row gets a tiny <code>last · 60 kg × 4</code> subline underneath. Keeps reference info co-located with the row you're filling in. Slightly denser."
+    },
+    {
+      title: "Tighter / denser",
+      sub: "reduced padding and font sizes throughout",
+      caption: "<b>−</b> ~15–20% less vertical space per exercise. Smaller stepper height, smaller fonts on meta lines, tighter coach line. Trades a bit of breathing room for seeing more exercises without scrolling."
+    },
+    {
+      title: "Right-aligned readouts",
+      sub: "stepper values align right, unit hugs the +",
+      caption: "<b>Change:</b> KG and reps values align right inside their steppers (like a calculator readout), with the <code>kg</code> unit snug against the <code>+</code> button. Small visual shift; some find it easier to scan tabular numbers this way."
+    },
+    {
+      title: "Combined — 02 + 03 + 04",
+      sub: "column headers · strong current highlight · inline last-session under each column",
+      caption: "<b>All three picks merged.</b> Column labels <code>SET · WEIGHT · REPS</code> up top. Current set gets a 1 px accent border + stronger tint so you always know which one's up. Last-session values sit directly under their own columns — <code>last · 60 kg</code> under kg, <code>last · 4</code> under reps — no left-squish, no separate block. The <code>LAST SESSION</code> header block is gone since the inline values replace it."
+    },
+  ];
+
+  document.getElementById('gallery').innerHTML = VARIATIONS.map((v, i) => `
+    <div class="wrap">
+      <div class="wrap-hdr">
+        <div>
+          <div class="idx">V${String(i + 1).padStart(2, '0')}</div>
+          <div class="wrap-title">${v.title}</div>
+          <div class="wrap-sub">${v.sub}</div>
+        </div>
+      </div>
+      ${phone(i + 1)}
+      <div class="wrap-cap">${v.caption}</div>
+    </div>
+  `).join('');
+</script>
+</body>
+</html>

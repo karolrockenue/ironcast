@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — active workout style directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg:        #0D0D0D;
+    --surface:   #1A1A1A;
+    --surface2:  #252525;
+    --surface3:  #2F2F2F;
+    --border:    #333;
+    --text:      #F5F5F5;
+    --muted:     #999;
+    --mutedX:    #666;
+    --accent:    #4A90D9;
+    --accent-tint: rgba(74,144,217,.14);
+    --accent-band: rgba(74,144,217,.22);
+    --warn:      #FFA726;
+    --warn-tint: rgba(255,167,38,.18);
+    --ok:        #4CAF50;
+    --ok-tint:   rgba(76,175,80,.22);
+    --danger:    #E05555;
+    --danger-tint: rgba(224,85,85,.20);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 32px 28px 12px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; }
+  .lede {
+    color: var(--muted); font-size: 14px; margin-top: 6px; max-width: 780px;
+    line-height: 1.5;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+    padding: 24px 28px 60px;
+    max-width: 1600px; margin: 0 auto;
+  }
+
+  .frame {
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 16px;
+    display: flex; flex-direction: column;
+  }
+  .frame-hdr {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .idx { font-size: 11px; letter-spacing: 2px; color: var(--muted); font-weight: 700; }
+  .title { font-size: 17px; font-weight: 800; margin-top: 4px; }
+  .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .caption {
+    font-size: 12px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 10px; margin-top: 14px; line-height: 1.5;
+  }
+  .caption b { color: var(--text); font-weight: 700; }
+
+  /* "phone" device frame */
+  .phone {
+    background: var(--bg);
+    border-radius: 14px;
+    padding: 10px 10px 0;
+    border: 1px solid #1f1f1f;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .elapsed { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .topbar .progress { color: var(--muted); font-size: 11px; font-weight: 700; }
+  .stack { display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 12px; }
+
+  /* ─── Card states (shared across variations) ─── */
+  .ex {
+    border-radius: 12px; padding: 12px;
+    background: var(--surface);
+    border: 1.5px solid transparent;
+  }
+  .ex.done {
+    background: rgba(76,175,80,.06);
+    border-color: rgba(76,175,80,.28);
+  }
+  .ex.active {
+    border-color: rgba(74,144,217,.4);
+    background: linear-gradient(180deg, rgba(74,144,217,.08), var(--surface) 60%);
+  }
+  .ex.pending { opacity: .55; }
+
+  .ex-hdr {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px;
+  }
+  .ex-title-wrap { flex: 1; min-width: 0; }
+  .ex-name { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .ex-name .check {
+    color: var(--ok); font-size: 14px; font-weight: 900;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 10px;
+    background: rgba(76,175,80,.18);
+  }
+  .ex-name .dot-active {
+    width: 7px; height: 7px; border-radius: 4px; background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74,144,217,.22);
+  }
+  .ex-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .pill {
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 10px; font-weight: 800; letter-spacing: .5px;
+    background: var(--accent-tint); color: var(--accent);
+    white-space: nowrap;
+  }
+  .pill.done { background: rgba(76,175,80,.18); color: var(--ok); }
+  .pill.pending { background: var(--surface2); color: var(--muted); }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip {
+    padding: 3px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: rgba(76,175,80,.16); color: var(--ok);
+  }
+
+  .coach {
+    border-left: 3px solid var(--accent);
+    padding: 4px 8px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ─── Stepper (shared, compact default) ─── */
+  .stp {
+    display: flex; align-items: center;
+    background: var(--surface2); border-radius: 8px; overflow: hidden;
+    height: 34px; flex: 1; min-width: 0;
+  }
+  .stp .b {
+    width: 30px; text-align: center; color: var(--text);
+    font-weight: 800; font-size: 15px;
+    background: rgba(255,255,255,.03);
+  }
+  .stp .v {
+    flex: 1; text-align: center; color: var(--text);
+    font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums;
+    padding: 0 2px;
+  }
+  .stp .v.ph { color: var(--mutedX); }
+  .stp .u {
+    font-size: 9px; color: var(--muted); letter-spacing: .5px;
+    padding-right: 6px;
+  }
+  .stp.tint-ok    { background: rgba(76,175,80,.18); }
+  .stp.tint-push  { background: rgba(74,144,217,.16); }
+  .stp.tint-low   { background: rgba(255,167,38,.16); }
+  .stp.tint-red   { background: var(--danger-tint); }
+  .stp.locked     { opacity: .7; }
+  .stp.locked .b  { visibility: hidden; }
+
+  .log {
+    width: 48px; height: 34px; border-radius: 8px;
+    background: var(--accent); color: #fff; font-weight: 900; font-size: 11px;
+    letter-spacing: 1; display: flex; justify-content: center; align-items: center;
+  }
+  .log.del { background: rgba(224,85,85,.16); color: var(--danger); font-size: 16px; }
+  .log.disabled { background: var(--surface2); color: var(--mutedX); }
+
+  /* ════════════════════════════════════════
+     V1 — "Minimal Monochrome"
+     ════════════════════════════════════════ */
+  .v1 .set {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 48px;
+    gap: 6px; align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .v1 .set:last-child { border-bottom: 0; }
+  .v1 .set-n {
+    font-size: 10px; font-weight: 800; color: var(--mutedX);
+    letter-spacing: 1.5px;
+  }
+  .v1 .set.current .set-n { color: var(--accent); }
+  .v1 .set.logged .set-n { color: var(--ok); }
+  .v1 .divider { height: 1px; background: rgba(255,255,255,.06); margin: 8px 0 6px; }
+
+  /* ════════════════════════════════════════
+     V2 — "Spacious Sub-Cards"
+     ════════════════════════════════════════ */
+  .v2 .set {
+    background: var(--surface2);
+    border-radius: 10px; padding: 10px;
+    margin-top: 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .v2 .set.current { background: rgba(74,144,217,.08); border: 1px solid rgba(74,144,217,.22); }
+  .v2 .set.logged { background: rgba(76,175,80,.08); border: 1px solid rgba(76,175,80,.22); }
+  .v2 .set-head {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .v2 .set-head .left {
+    font-size: 11px; letter-spacing: 1.5px; font-weight: 800;
+    color: var(--muted);
+  }
+  .v2 .set.current .set-head .left { color: var(--accent); }
+  .v2 .set.logged .set-head .left { color: var(--ok); }
+  .v2 .set-head .summary {
+    font-size: 13px; font-weight: 800; color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .v2 .set-controls { display: flex; gap: 8px; align-items: center; }
+
+  /* ════════════════════════════════════════
+     V3 — "Labeled Columns"
+     ════════════════════════════════════════ */
+  .v3 .col-head {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 48px;
+    gap: 6px;
+    padding: 0 0 4px;
+    font-size: 9px; color: var(--mutedX); letter-spacing: 1.5px; font-weight: 800;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .v3 .col-head > span { text-align: center; }
+  .v3 .col-head > span:first-child { text-align: left; }
+  .v3 .set {
+    display: grid;
+    grid-template-columns: 36px 1fr 1fr 48px;
+    gap: 6px; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .v3 .set:last-child { border-bottom: 0; }
+  .v3 .set-n {
+    font-size: 11px; font-weight: 800; color: var(--mutedX);
+    letter-spacing: 1.5px;
+  }
+  .v3 .set.current .set-n { color: var(--accent); }
+  .v3 .set.logged .set-n { color: var(--ok); }
+
+  /* ════════════════════════════════════════
+     V4 — "Two-row Sets"
+     ════════════════════════════════════════ */
+  .v4 .set {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+  .v4 .set:first-of-type { border-top: 0; padding-top: 6px; }
+  .v4 .set-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
+  }
+  .v4 .set-n {
+    font-size: 11px; font-weight: 800; letter-spacing: 2px;
+    color: var(--mutedX);
+  }
+  .v4 .set.current .set-n { color: var(--accent); }
+  .v4 .set.logged .set-n { color: var(--ok); }
+  .v4 .set-summary {
+    font-size: 13px; font-weight: 800; color: var(--ok);
+    font-variant-numeric: tabular-nums;
+  }
+  .v4 .set-row { display: flex; gap: 10px; align-items: center; }
+  .v4 .stp { height: 38px; }
+  .v4 .log { height: 38px; }
+  .v4 .inline-log { width: 64px; }
+
+  /* ════════════════════════════════════════
+     V5 — "Reps-first Hero"
+     ════════════════════════════════════════ */
+  .v5 .set {
+    margin-top: 8px; padding: 10px 2px;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+  .v5 .set:first-of-type { border-top: 0; }
+  .v5 .set-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: 1.5px; font-weight: 800;
+    color: var(--mutedX); margin-bottom: 6px;
+  }
+  .v5 .set.current .set-meta .n { color: var(--accent); }
+  .v5 .set.logged .set-meta .n { color: var(--ok); }
+  .v5 .reps-big {
+    text-align: center; font-size: 46px; font-weight: 900;
+    line-height: 1; font-variant-numeric: tabular-nums;
+    color: var(--text);
+    padding: 4px 0 6px;
+  }
+  .v5 .reps-big.ph { color: var(--mutedX); font-weight: 700; font-size: 34px; }
+  .v5 .reps-tint-ok   { color: var(--ok); }
+  .v5 .reps-tint-push { color: var(--accent); }
+  .v5 .reps-tint-low  { color: var(--warn); }
+  .v5 .reps-tint-red  { color: var(--danger); }
+  .v5 .reps-controls { display: flex; justify-content: center; gap: 6px; margin-top: 2px; }
+  .v5 .reps-controls .b {
+    width: 38px; height: 32px; border-radius: 8px;
+    background: var(--surface2); text-align: center; font-weight: 800;
+    color: var(--text); font-size: 13px; line-height: 32px;
+  }
+  .v5 .kg-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .v5 .kg-row .stp { height: 32px; }
+  .v5 .kg-row .log { height: 32px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Active workout — 5 style directions</h1>
+  <p class="lede">
+    Functionality locked in: active / pending / done states, steppers for KG and
+    reps, Log button, range pill, coach line, back-off Set 2 auto-calc,
+    last-session reps as placeholder, red when reps &lt; last session.
+    All five mockups carry the exact same content — an in-progress <b>Workout A</b>
+    where <b>Machine Bench Press</b> is DONE, <b>Lat Pulldown</b> is ACTIVE (set 1
+    logged at 60×7, set 2 pending with auto-backed-off 50 kg), and <b>Seated Row</b>
+    is PENDING. Different variations purely vary layout, density, and
+    typography — pick one.
+  </p>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+  // ────────────────────────────────────────────────
+  // Shared test data (Workout A mid-session)
+  // ────────────────────────────────────────────────
+  const EX = {
+    done: {
+      name: "Machine Bench Press",
+      range: "5–8",
+      logged: [
+        { n: 1, kg: 55, reps: 8, tint: "ok" },
+        { n: 2, kg: 50, reps: 5, tint: "ok" },
+      ],
+    },
+    active: {
+      name: "Lat Pulldown (Cable)",
+      range: "5–8",
+      coach: "Hit top of range — try +5 kg",
+      sets: [
+        { n: 1, kg: 60, reps: 7, tint: "ok", lastReps: 7, state: "logged" },
+        { n: 2, kg: 50, reps: null, placeholder: "6", hint: "80% back-off (60 × 0.80 → 48 → 50)", tint: null, lastReps: 6, state: "current" },
+      ],
+    },
+    pending: {
+      name: "Seated Row (Machine)",
+      range: "6–10",
+      sets: 2,
+      lastTop: "60 kg × 8",
+    },
+  };
+
+  // ────────────────────────────────────────────────
+  // Helper: stepper HTML (locked / editable)
+  // ────────────────────────────────────────────────
+  function stepperKg(kg, locked) {
+    const cls = locked ? "stp locked" : "stp";
+    return `<div class="${cls}">
+      <span class="b">−</span>
+      <span class="v">${kg}</span>
+      <span class="u">kg</span>
+      <span class="b">＋</span>
+    </div>`;
+  }
+  function stepperReps(reps, placeholder, tint, locked) {
+    const cls = ["stp"];
+    if (locked) cls.push("locked");
+    if (tint) cls.push(`tint-${tint}`);
+    const val = reps != null
+      ? `<span class="v">${reps}</span>`
+      : `<span class="v ph">${placeholder ?? "reps"}</span>`;
+    return `<div class="${cls.join(' ')}">
+      <span class="b">−</span>
+      ${val}
+      <span class="b">＋</span>
+    </div>`;
+  }
+  function logBtn(state) {
+    if (state === "logged")  return `<div class="log del">×</div>`;
+    if (state === "disabled") return `<div class="log disabled">LOG</div>`;
+    return `<div class="log">LOG</div>`;
+  }
+
+  // ────────────────────────────────────────────────
+  // Card builders — one per variation
+  // ────────────────────────────────────────────────
+  function doneCard(ex) {
+    const chips = ex.logged.map(l => `<span class="chip">${l.kg}×${l.reps}</span>`).join('');
+    return `
+      <div class="ex done">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="check">✓</span>${ex.name}</div>
+            <div class="ex-sub">${ex.logged.length} sets · all logged</div>
+          </div>
+          <span class="pill done">DONE</span>
+        </div>
+        <div class="chips">${chips}</div>
+      </div>`;
+  }
+  function pendingCard(ex) {
+    return `
+      <div class="ex pending">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-sub">${ex.sets} sets · last ${ex.lastTop}</div>
+          </div>
+          <span class="pill pending">${ex.range}</span>
+        </div>
+      </div>`;
+  }
+
+  // Active card varies by variation — factored per-v function below
+
+  // ────── V1 Minimal ──────
+  function v1Active(ex) {
+    const rows = ex.sets.map(s => {
+      const locked = s.state === "logged";
+      return `<div class="set ${s.state}">
+        <div class="set-n">SET ${s.n}</div>
+        ${stepperKg(s.kg, locked)}
+        ${stepperReps(s.reps, s.placeholder, s.tint, locked)}
+        ${logBtn(s.state === "logged" ? "logged" : (s.reps == null ? "disabled" : "enabled"))}
+      </div>`;
+    }).join('');
+    return `
+      <div class="ex active v1">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>${ex.name}</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">${ex.range}</span>
+        </div>
+        ${ex.coach ? `<div class="coach">${ex.coach}</div>` : ''}
+        <div class="divider"></div>
+        ${rows}
+      </div>`;
+  }
+
+  // ────── V2 Spacious Sub-Cards ──────
+  function v2Active(ex) {
+    const rows = ex.sets.map(s => {
+      const locked = s.state === "logged";
+      const summary = locked
+        ? `<span class="summary">${s.kg} kg × ${s.reps}</span>`
+        : '';
+      return `<div class="set ${s.state}">
+        <div class="set-head">
+          <span class="left">SET ${s.n}${locked ? ' · logged' : ''}</span>
+          ${summary || (s.reps == null ? '<span class="left">tap LOG when done</span>' : '')}
+        </div>
+        <div class="set-controls">
+          ${stepperKg(s.kg, locked)}
+          ${stepperReps(s.reps, s.placeholder, s.tint, locked)}
+          ${logBtn(locked ? "logged" : (s.reps == null ? "disabled" : "enabled"))}
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <div class="ex active v2">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>${ex.name}</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">${ex.range}</span>
+        </div>
+        ${ex.coach ? `<div class="coach">${ex.coach}</div>` : ''}
+        ${rows}
+      </div>`;
+  }
+
+  // ────── V3 Labeled Columns ──────
+  function v3Active(ex) {
+    const rows = ex.sets.map(s => {
+      const locked = s.state === "logged";
+      return `<div class="set ${s.state}">
+        <div class="set-n">SET ${s.n}</div>
+        ${stepperKg(s.kg, locked)}
+        ${stepperReps(s.reps, s.placeholder, s.tint, locked)}
+        ${logBtn(locked ? "logged" : (s.reps == null ? "disabled" : "enabled"))}
+      </div>`;
+    }).join('');
+    return `
+      <div class="ex active v3">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>${ex.name}</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">${ex.range}</span>
+        </div>
+        ${ex.coach ? `<div class="coach">${ex.coach}</div>` : ''}
+        <div style="margin-top: 10px;">
+          <div class="col-head">
+            <span>SET</span><span>WEIGHT</span><span>REPS</span><span></span>
+          </div>
+          ${rows}
+        </div>
+      </div>`;
+  }
+
+  // ────── V4 Two-row Sets ──────
+  function v4Active(ex) {
+    const rows = ex.sets.map(s => {
+      const locked = s.state === "logged";
+      if (locked) {
+        return `<div class="set ${s.state}">
+          <div class="set-head">
+            <span class="set-n">SET ${s.n} · LOGGED</span>
+            <span class="set-summary">${s.kg} kg × ${s.reps}</span>
+          </div>
+        </div>`;
+      }
+      return `<div class="set ${s.state}">
+        <div class="set-head">
+          <span class="set-n">SET ${s.n}</span>
+          <span style="font-size:11px; color:var(--muted);">${s.hint ? 'back-off · ' + s.hint.split('(')[1].replace(')', '') : ''}</span>
+        </div>
+        <div class="set-row">
+          ${stepperKg(s.kg, false)}
+          ${stepperReps(s.reps, s.placeholder, s.tint, false)}
+          <div class="log inline-log ${s.reps == null ? 'disabled' : ''}">LOG</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <div class="ex active v4">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>${ex.name}</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">${ex.range}</span>
+        </div>
+        ${ex.coach ? `<div class="coach">${ex.coach}</div>` : ''}
+        ${rows}
+      </div>`;
+  }
+
+  // ────── V5 Reps-first Hero ──────
+  function v5Active(ex) {
+    const rows = ex.sets.map(s => {
+      const locked = s.state === "logged";
+      const tintClass = s.tint ? `reps-tint-${s.tint}` : '';
+      const repsDisplay = s.reps != null
+        ? `<div class="reps-big ${tintClass}">${s.reps}</div>`
+        : `<div class="reps-big ph">${s.placeholder ?? "—"}</div>`;
+      return `<div class="set ${s.state}">
+        <div class="set-meta">
+          <span class="n">SET ${s.n}</span>
+          <span>${locked ? 'LOGGED ✓' : (s.hint || 'enter reps')}</span>
+        </div>
+        ${repsDisplay}
+        ${!locked ? `<div class="reps-controls">
+          <span class="b">−</span><span class="b">+</span>
+        </div>` : ''}
+        <div class="kg-row">
+          ${stepperKg(s.kg, locked)}
+          ${logBtn(locked ? "logged" : (s.reps == null ? "disabled" : "enabled"))}
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <div class="ex active v5">
+        <div class="ex-hdr">
+          <div class="ex-title-wrap">
+            <div class="ex-name"><span class="dot-active"></span>${ex.name}</div>
+            <div class="ex-sub">2 sets · last 60 kg × 7</div>
+          </div>
+          <span class="pill">${ex.range}</span>
+        </div>
+        ${ex.coach ? `<div class="coach">${ex.coach}</div>` : ''}
+        ${rows}
+      </div>`;
+  }
+
+  // ────────────────────────────────────────────────
+  // Frame + phone scaffolding
+  // ────────────────────────────────────────────────
+  function frame(idx, title, subtitle, activeCardHTML, caption) {
+    return `
+      <div class="frame">
+        <div class="frame-hdr">
+          <div>
+            <div class="idx">DIRECTION ${String(idx).padStart(2,'0')}</div>
+            <div class="title">${title}</div>
+            <div class="subtitle">${subtitle}</div>
+          </div>
+        </div>
+        <div class="phone">
+          <div class="topbar">
+            <span class="elapsed">14:02</span>
+            <span class="progress">3 / 14 sets</span>
+          </div>
+          <div class="stack">
+            ${doneCard(EX.done)}
+            ${activeCardHTML}
+            ${pendingCard(EX.pending)}
+          </div>
+        </div>
+        <div class="caption">${caption}</div>
+      </div>
+    `;
+  }
+
+  const variations = [
+    frame(1, "Minimal monochrome", "tight single row per set",
+      v1Active(EX.active),
+      "<b>Cleanest.</b> Every set is one tight row: set label, kg stepper, reps stepper, Log. No column headers, no labels. Pure function. Smallest vertical footprint — fits more exercises on screen at once."
+    ),
+    frame(2, "Spacious sub-cards", "each set is its own tinted card",
+      v2Active(EX.active),
+      "<b>Most legible.</b> Each set gets its own sub-card with a header strip showing state. Controls sit on a clean inner row. Bigger tap targets, easier to scan which set you're on. Takes ~40% more vertical space."
+    ),
+    frame(3, "Labeled columns", "table-style with WEIGHT / REPS headers",
+      v3Active(EX.active),
+      "<b>Most explicit.</b> Column headers (SET · WEIGHT · REPS) appear once above the rows, form-like. Good for first-time users; slightly redundant once you know the app. Same density as V1 otherwise."
+    ),
+    frame(4, "Two-row sets", "header row + controls row per set",
+      v4Active(EX.active),
+      "<b>Breathable.</b> Each set splits into a header row (set #, back-off hint on Set 2, or logged summary) and a controls row underneath. Lots of room for hints like the back-off calculation. Tallest overall."
+    ),
+    frame(5, "Reps-first hero", "big centered rep count",
+      v5Active(EX.active),
+      "<b>Reps as the star.</b> The rep number is the biggest thing on screen — matches the 'what did you actually do?' mental model. Kg stepper and Log button sit on a compact strip beneath. Best for phone-in-hand glanceability."
+    ),
+  ];
+  document.getElementById('gallery').innerHTML = variations.join('');
+</script>
+</body>
+</html>

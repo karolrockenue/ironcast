@@ -1,0 +1,1161 @@
+import { useEffect, useState, useCallback, useMemo } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Alert,
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
+import { useDB } from "../../src/db/provider";
+import {
+  addSet,
+  deleteSet,
+  finishWorkout,
+  deleteWorkout,
+  getSetsForWorkout,
+  getPrescribedExercises,
+  getLastSetForExercise,
+  getLastSessionSetsForExercise,
+  getTechniqueDeadliftWeight,
+  decideProgression,
+  detectPRsForSet1,
+  SetRow,
+  PrescribedExercise,
+  LastSet,
+  PRKind,
+} from "../../src/db/queries";
+import { useRestTimer } from "../../src/store/restTimer";
+import { RestTimerOverlay } from "../../src/components/RestTimerOverlay";
+import { PrCelebration } from "../../src/components/PrCelebration";
+import { colors } from "../../src/theme/colors";
+import * as SQLite from "expo-sqlite";
+
+// ─── Helpers ───────────────────────────────────────────────
+function useElapsed() {
+  const [s, setS] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const i = setInterval(() => setS(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(i);
+  }, []);
+  return s;
+}
+
+function fmt(t: number) {
+  const m = Math.floor(t / 60);
+  const s = t % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+type DeadliftMode = "heavy" | "technique" | null;
+
+async function fetchWorkoutMode(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number
+): Promise<DeadliftMode> {
+  const row = await db.getFirstAsync<{ deadlift_mode: string | null }>(
+    "SELECT deadlift_mode FROM workouts WHERE id = ?",
+    [workoutId]
+  );
+  const mode = row?.deadlift_mode;
+  if (mode === "heavy" || mode === "technique") return mode;
+  return null;
+}
+
+// ─── Suggested weight logic ────────────────────────────────
+// The weight we pre-fill into the stepper for the next set of an exercise:
+//  - technique-day deadlift → 75% of last heavy
+//  - last set of this session (if any) → that weight
+//  - progression engine suggestion (based on last finished session)
+//  - else 0 (user picks)
+function suggestStartingWeight(
+  ex: PrescribedExercise,
+  lastSet: LastSet | null,
+  deadliftMode: DeadliftMode,
+  techniqueWeight: number | null
+): number {
+  if (
+    ex.special_rules === "deadlift_ht" &&
+    deadliftMode === "technique" &&
+    techniqueWeight !== null
+  ) {
+    return techniqueWeight;
+  }
+  const p = decideProgression(
+    {
+      rep_min: ex.default_rep_min,
+      rep_max: ex.default_rep_max,
+      weight_increment: ex.weight_increment,
+      special_rules: ex.special_rules,
+      deadlift_mode: deadliftMode,
+      technique_weight: techniqueWeight,
+    },
+    lastSet
+  );
+  if (p.direction !== "none") return p.suggested_weight;
+  return 0;
+}
+
+// ─── Stepper with typed input ──────────────────────────────
+// Used for both kg and reps. The value lives in the parent; this component
+// just mirrors it and commits on button taps or when the user types.
+function NumericStepper({
+  value,
+  step,
+  unit,
+  onChange,
+  disabled,
+  placeholder = "—",
+  tint,
+  allowEmpty = false,
+  style,
+}: {
+  value: number | null;
+  step: number;
+  unit?: string;
+  onChange: (n: number | null) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  tint?: string;
+  allowEmpty?: boolean;
+  style?: any;
+}) {
+  const eff = step <= 0 ? 1 : step;
+  const [text, setText] = useState<string>(value == null ? "" : String(value));
+
+  // Keep the text in sync when the external value changes (e.g. after log).
+  useEffect(() => {
+    setText(value == null ? "" : String(value));
+  }, [value]);
+
+  const handleDec = () => {
+    if (disabled) return;
+    const cur = value ?? 0;
+    const next = +(cur - eff).toFixed(2);
+    if (next <= 0 && allowEmpty) onChange(null);
+    else onChange(Math.max(0, next));
+    Haptics.selectionAsync();
+  };
+  const handleInc = () => {
+    if (disabled) return;
+    const cur = value ?? 0;
+    onChange(+(cur + eff).toFixed(2));
+    Haptics.selectionAsync();
+  };
+
+  return (
+    <View
+      style={[
+        st.wrap,
+        tint ? { backgroundColor: tint } : null,
+        disabled && { opacity: 0.65 },
+        style,
+      ]}
+    >
+      <Pressable style={st.btn} onPress={handleDec} disabled={disabled}>
+        <Text style={st.btnText}>-</Text>
+      </Pressable>
+      <TextInput
+        style={st.val}
+        value={text}
+        editable={!disabled}
+        keyboardType="numeric"
+        selectTextOnFocus
+        placeholder={placeholder}
+        placeholderTextColor={colors.textSecondary}
+        onChangeText={(t) => {
+          setText(t);
+          if (t === "") {
+            if (allowEmpty) onChange(null);
+            return;
+          }
+          const n = parseFloat(t);
+          if (!isNaN(n)) onChange(n);
+        }}
+      />
+      {unit ? <Text style={st.unit}>{unit}</Text> : null}
+      <Pressable style={st.btn} onPress={handleInc} disabled={disabled}>
+        <Text style={st.btnText}>+</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// Tint the reps stepper background based on the entered value vs the target
+// range AND the previous session's reps.
+// Red (regression vs last session) always wins — it's the stronger signal.
+function repsTint(
+  reps: number | null,
+  min: number,
+  max: number,
+  lastReps: number | null
+): string | undefined {
+  if (reps == null || reps <= 0) return undefined;
+  if (lastReps != null && reps < lastReps)
+    return "rgba(224,85,85,0.18)"; // red — fewer reps than last time
+  if (reps >= max) return "rgba(74,144,217,0.16)"; // at/above top → push
+  if (reps >= min) return "rgba(76,175,80,0.18)"; // in range
+  return "rgba(255,167,38,0.16)"; // below target
+}
+
+// Round a weight to the equipment's nearest step.
+function roundToIncrement(weight: number, increment: number) {
+  if (increment <= 0) return weight;
+  return +(Math.round(weight / increment) * increment).toFixed(2);
+}
+
+// Back-off ratio, with deadlift technique-day override to straight sets (1.0).
+function effectiveBackOff(
+  ex: PrescribedExercise,
+  deadliftMode: DeadliftMode
+) {
+  if (ex.special_rules === "deadlift_ht" && deadliftMode === "technique")
+    return 1.0;
+  return ex.back_off_ratio;
+}
+
+const st = StyleSheet.create({
+  wrap: {
+    // sizing is left to the caller — pass `flex: 1` to take remainder,
+    // or `width: N` to fix width. (Don't put `flex` here; it conflicts with
+    // downstream `width` overrides in RN/Yoga and collapses the stepper.)
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 8,
+    height: 38,
+    paddingHorizontal: 2,
+  },
+  btn: {
+    width: 28,
+    height: 38,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnText: { color: colors.text, fontSize: 16, fontWeight: "800" },
+  val: {
+    flex: 1,
+    paddingHorizontal: 1,
+    paddingVertical: 0,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    textAlign: "center",
+    minWidth: 28,
+  },
+  unit: {
+    color: colors.textSecondary,
+    fontSize: 9,
+    letterSpacing: 0.3,
+    marginRight: 2,
+  },
+});
+
+// Log / delete button for a set row.
+function LogButton({
+  logged,
+  disabled,
+  onPress,
+}: {
+  logged: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  if (logged) {
+    return (
+      <Pressable style={[lb.btn, lb.btnDel]} onPress={onPress} hitSlop={8}>
+        <Text style={lb.btnDelText}>{"\u00D7"}</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      style={[lb.btn, lb.btnLog, disabled && { opacity: 0.35 }]}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+    >
+      <Text style={lb.btnLogText}>LOG</Text>
+    </Pressable>
+  );
+}
+const lb = StyleSheet.create({
+  btn: {
+    width: 52,
+    height: 38,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnLog: { backgroundColor: colors.accent },
+  btnLogText: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 1 },
+  btnDel: { backgroundColor: "rgba(224,85,85,0.15)" },
+  btnDelText: { color: colors.danger, fontSize: 20, fontWeight: "700" },
+});
+
+// ─── Cards ────────────────────────────────────────────────
+function DoneCard({
+  ex,
+  logged,
+}: {
+  ex: PrescribedExercise;
+  logged: SetRow[];
+}) {
+  const chips = logged.map((s) => {
+    const state =
+      s.reps >= ex.default_rep_max
+        ? "push"
+        : s.reps >= ex.default_rep_min
+        ? "ok"
+        : "low";
+    const bg =
+      state === "ok"
+        ? "rgba(76,175,80,0.16)"
+        : state === "push"
+        ? "rgba(74,144,217,0.16)"
+        : "rgba(255,167,38,0.16)";
+    const fg =
+      state === "ok"
+        ? colors.success
+        : state === "push"
+        ? colors.accent
+        : colors.warning;
+    return (
+      <View key={s.id} style={[c.chip, { backgroundColor: bg }]}>
+        <Text style={[c.chipText, { color: fg }]}>{s.reps}</Text>
+      </View>
+    );
+  });
+  return (
+    <View style={[c.card, c.cardDone]}>
+      <View style={c.hdr}>
+        <View style={{ flex: 1 }}>
+          <View style={c.nameRow}>
+            <View style={c.check}>
+              <Text style={c.checkText}>{"\u2713"}</Text>
+            </View>
+            <Text style={c.name} numberOfLines={1}>
+              {ex.exercise_name}
+            </Text>
+          </View>
+          <Text style={c.sub}>
+            {logged.length} sets · {logged[0]?.weight ?? "?"} kg
+          </Text>
+        </View>
+        <View style={[c.pill, c.pillDone]}>
+          <Text style={[c.pillText, c.pillDoneText]}>DONE</Text>
+        </View>
+      </View>
+      <View style={c.chips}>{chips}</View>
+    </View>
+  );
+}
+
+function PendingCard({
+  ex,
+  onActivate,
+}: {
+  ex: PrescribedExercise;
+  onActivate: () => void;
+}) {
+  return (
+    <Pressable style={[c.card, c.cardPending]} onPress={onActivate}>
+      <View style={c.hdr}>
+        <View style={{ flex: 1 }}>
+          <Text style={c.name} numberOfLines={1}>
+            {ex.exercise_name}
+          </Text>
+          <Text style={c.sub}>
+            {ex.default_sets} sets · target {ex.default_rep_min}–{ex.default_rep_max}
+          </Text>
+        </View>
+        <View style={[c.pill, c.pillPending]}>
+          <Text style={[c.pillText, c.pillPendingText]}>
+            {ex.default_rep_min}–{ex.default_rep_max}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function ActiveCard({
+  ex,
+  logged,
+  lastSet,
+  lastSessionSets,
+  deadliftMode,
+  techniqueWeight,
+  onLogSet,
+  onDeleteSet,
+}: {
+  ex: PrescribedExercise;
+  logged: SetRow[];
+  lastSet: LastSet | null;
+  lastSessionSets: Map<number, LastSet>;
+  deadliftMode: DeadliftMode;
+  techniqueWeight: number | null;
+  onLogSet: (setIdx: number, weight: number, reps: number) => void;
+  onDeleteSet: (setId: number) => void;
+}) {
+  const isDeadlift = ex.special_rules === "deadlift_ht";
+  const isTechniqueDeadlift = isDeadlift && deadliftMode === "technique";
+  const isHeavyDeadlift = isDeadlift && deadliftMode === "heavy";
+
+  const suggested = suggestStartingWeight(
+    ex,
+    lastSet,
+    deadliftMode,
+    techniqueWeight
+  );
+
+  // Per-set KG. Each row owns its own value: logged sets are locked to the
+  // stored weight; pending sets default to the most recent logged set's weight,
+  // or the suggestion.
+  const lastLoggedWeight =
+    logged.length > 0 ? logged[logged.length - 1].weight : suggested;
+  const defaultPendingKg = lastLoggedWeight;
+
+  const backOff = effectiveBackOff(ex, deadliftMode);
+
+  // Initial Set 1 kg = last session's weight (or progression), Set 2+ = back-off.
+  const [kgPerSet, setKgPerSet] = useState<number[]>(() =>
+    Array.from({ length: ex.default_sets }, (_, i) => {
+      const row = logged.find((l) => l.set_number === i + 1);
+      if (row) return row.weight;
+      if (i === 0) return suggested || defaultPendingKg;
+      // Back-off sets derive from Set 1's current weight.
+      const s1 = logged.find((l) => l.set_number === 1);
+      const base = s1?.weight ?? suggested ?? defaultPendingKg;
+      return roundToIncrement(base * backOff, ex.min_increment_kg);
+    })
+  );
+  // Reps per pending set — user types or steps into these. Logged sets don't
+  // consult this state; their value comes from the DB row.
+  const [repsPerSet, setRepsPerSet] = useState<(number | null)[]>(() =>
+    Array.from({ length: ex.default_sets }, () => null)
+  );
+
+  // Sync logged sets' weights into state when new sets arrive.
+  useEffect(() => {
+    setKgPerSet((prev) => {
+      const next = [...prev];
+      for (let i = 0; i < ex.default_sets; i++) {
+        const row = logged.find((l) => l.set_number === i + 1);
+        if (row) next[i] = row.weight;
+      }
+      return next;
+    });
+  }, [logged, ex.default_sets]);
+
+  // Dynamic Set 2+ recalculation: once Set 1 is logged, every back-off set
+  // updates to reflect the actual Set 1 weight. Skips sets that are themselves
+  // already logged (those are frozen to their DB value).
+  useEffect(() => {
+    const set1 = logged.find((l) => l.set_number === 1);
+    if (!set1 || ex.default_sets < 2) return;
+    setKgPerSet((prev) => {
+      const next = [...prev];
+      for (let i = 1; i < ex.default_sets; i++) {
+        const alreadyLogged = logged.find((l) => l.set_number === i + 1);
+        if (alreadyLogged) continue;
+        next[i] = roundToIncrement(set1.weight * backOff, ex.min_increment_kg);
+      }
+      return next;
+    });
+  }, [logged, ex.default_sets, backOff, ex.min_increment_kg]);
+
+  const currentSetIdx = logged.length; // first pending set
+  const allDone = logged.length >= ex.default_sets;
+
+  const progMsg = useMemo(() => {
+    const p = decideProgression(
+      {
+        rep_min: ex.default_rep_min,
+        rep_max: ex.default_rep_max,
+        weight_increment: ex.weight_increment,
+        special_rules: ex.special_rules,
+        deadlift_mode: deadliftMode,
+        technique_weight: techniqueWeight,
+      },
+      lastSet
+    );
+    return p.message;
+  }, [ex, lastSet, deadliftMode, techniqueWeight]);
+
+  return (
+    <View style={[c.card, c.cardActive]}>
+      {/* Deadlift H/T banner */}
+      {isHeavyDeadlift && (
+        <View style={[c.deadBanner, c.deadHeavy]}>
+          <Text style={[c.deadLabel, { color: colors.accent }]}>HEAVY DAY</Text>
+          <Text style={c.deadSub}>push it — track top set carefully</Text>
+        </View>
+      )}
+      {isTechniqueDeadlift && (
+        <View style={[c.deadBanner, c.deadTech]}>
+          <Text style={[c.deadLabel, { color: colors.warning }]}>
+            TECHNIQUE DAY
+          </Text>
+          <Text style={c.deadSub}>
+            {techniqueWeight != null
+              ? `75% of last heavy — ${techniqueWeight} kg · strict form`
+              : "Pick a light warm-up weight · strict form"}
+          </Text>
+        </View>
+      )}
+
+      <View style={c.hdr}>
+        <View style={{ flex: 1 }}>
+          <View style={c.nameRow}>
+            <View style={c.activeDot} />
+            <Text style={c.name} numberOfLines={1}>
+              {ex.exercise_name}
+            </Text>
+          </View>
+          <Text style={c.sub}>
+            {ex.default_sets} sets · last time{" "}
+            {lastSet
+              ? `${lastSet.weight} kg × ${lastSet.reps}`
+              : "—"}
+          </Text>
+        </View>
+        <View style={c.pill}>
+          <Text style={c.pillText}>
+            {ex.default_rep_min}–{ex.default_rep_max}
+          </Text>
+        </View>
+      </View>
+
+      {/* Coach line — only when nothing logged yet */}
+      {logged.length === 0 && (
+        <View style={c.coach}>
+          <Text style={c.coachText}>{progMsg}</Text>
+        </View>
+      )}
+
+      {/* Set rows — column headers + blocks with optional inline last-session */}
+      <View style={c.setsWrap}>
+        <View style={c.colHeaders}>
+          <Text style={c.colHeaderSet}>SET</Text>
+          <Text style={c.colHeaderKg}>WEIGHT</Text>
+          <Text style={c.colHeaderReps}>REPS</Text>
+          <View style={{ width: 52 }} />
+        </View>
+
+        {Array.from({ length: ex.default_sets }).map((_, idx) => {
+          const row = logged.find((l) => l.set_number === idx + 1);
+          const isCurrent = !row && idx === currentSetIdx;
+          const kg = kgPerSet[idx] ?? defaultPendingKg;
+          const pendingReps = repsPerSet[idx];
+          const displayedReps = row?.reps ?? pendingReps;
+          const last = lastSessionSets.get(idx + 1);
+          const isLastSet = idx === ex.default_sets - 1;
+          const commit = () => {
+            if (row) return;
+            if (pendingReps == null || pendingReps <= 0) return;
+            onLogSet(idx, kg, pendingReps);
+          };
+          return (
+            <View
+              key={idx}
+              style={[
+                c.setBlock,
+                isCurrent && c.setBlockCurrent,
+                isLastSet && !isCurrent && c.setBlockLast,
+              ]}
+            >
+              <View style={c.setInner}>
+                <Text
+                  style={[
+                    c.setN,
+                    isCurrent && { color: "#fff" },
+                    row && { color: colors.success },
+                  ]}
+                >
+                  SET {idx + 1}
+                </Text>
+                <NumericStepper
+                  value={kg}
+                  step={ex.min_increment_kg}
+                  unit="kg"
+                  disabled={!!row}
+                  style={{ width: 108 }}
+                  onChange={(n) => {
+                    setKgPerSet((prev) => {
+                      const next = [...prev];
+                      next[idx] = n ?? 0;
+                      return next;
+                    });
+                  }}
+                />
+                <NumericStepper
+                  value={displayedReps ?? null}
+                  step={1}
+                  placeholder={
+                    last?.reps != null ? String(last.reps) : "reps"
+                  }
+                  disabled={!!row}
+                  allowEmpty
+                  style={{ flex: 1 }}
+                  tint={
+                    row
+                      ? undefined
+                      : repsTint(
+                          pendingReps,
+                          ex.default_rep_min,
+                          ex.default_rep_max,
+                          last?.reps ?? null
+                        )
+                  }
+                  onChange={(n) => {
+                    setRepsPerSet((prev) => {
+                      const next = [...prev];
+                      next[idx] = n;
+                      return next;
+                    });
+                  }}
+                />
+                <LogButton
+                  logged={!!row}
+                  disabled={
+                    !row && (pendingReps == null || pendingReps <= 0)
+                  }
+                  onPress={() => {
+                    if (row) onDeleteSet(row.id);
+                    else commit();
+                  }}
+                />
+              </View>
+              {last && (
+                <View style={c.setLastInline}>
+                  <View style={{ width: 42 }} />
+                  <Text style={c.setLastInlineKg}>
+                    last · {last.weight} kg
+                  </Text>
+                  <Text style={c.setLastInlineReps}>last · {last.reps}</Text>
+                  <View style={{ width: 52 }} />
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────
+export default function ActiveWorkout() {
+  const { id, templateId } = useLocalSearchParams<{
+    id: string;
+    templateId?: string;
+  }>();
+  const workoutId = Number(id);
+  const db = useDB();
+  const router = useRouter();
+  const rest = useRestTimer();
+  const elapsed = useElapsed();
+
+  const [sets, setSets] = useState<SetRow[]>([]);
+  const [prescribed, setPrescribed] = useState<PrescribedExercise[]>([]);
+  const [lastSetByEx, setLastSetByEx] = useState<Map<number, LastSet>>(new Map());
+  const [lastSessionByEx, setLastSessionByEx] = useState<
+    Map<number, Map<number, LastSet>>
+  >(new Map());
+  const [deadliftMode, setDeadliftMode] = useState<DeadliftMode>(null);
+  const [techniqueWeight, setTechniqueWeight] = useState<number | null>(null);
+  const [manualActiveId, setManualActiveId] = useState<number | null>(null);
+  const [celebration, setCelebration] = useState<{
+    kind: PRKind;
+    exerciseName: string;
+    value: string;
+  } | null>(null);
+
+  // Load prescription + workout mode + last-session data
+  useEffect(() => {
+    if (!templateId) return;
+    const tid = Number(templateId);
+    (async () => {
+      const [rows, mode, tech] = await Promise.all([
+        getPrescribedExercises(db, tid),
+        fetchWorkoutMode(db, workoutId),
+        getTechniqueDeadliftWeight(db),
+      ]);
+      // Deadlift day-variant override: heavy day uses 1 set, technique 2.
+      // Base seed stores default_sets=2 (matches technique); only heavy
+      // needs to be narrowed.
+      const adjusted = rows.map((r) =>
+        r.special_rules === "deadlift_ht" && mode === "heavy"
+          ? { ...r, default_sets: 1 }
+          : r
+      );
+      setPrescribed(adjusted);
+      setDeadliftMode(mode);
+      setTechniqueWeight(tech);
+      const byEx = new Map<number, LastSet>();
+      const bySession = new Map<number, Map<number, LastSet>>();
+      for (const p of rows) {
+        const [ls, session] = await Promise.all([
+          getLastSetForExercise(db, p.exercise_id, workoutId),
+          getLastSessionSetsForExercise(db, p.exercise_id, workoutId),
+        ]);
+        if (ls) byEx.set(p.exercise_id, ls);
+        if (session.size > 0) bySession.set(p.exercise_id, session);
+      }
+      setLastSetByEx(byEx);
+      setLastSessionByEx(bySession);
+    })();
+  }, [db, templateId, workoutId]);
+
+  const reload = useCallback(async () => {
+    setSets(await getSetsForWorkout(db, workoutId));
+  }, [db, workoutId]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Compute active exercise — manual override, else first incomplete.
+  const setsCount = useCallback(
+    (exId: number) => sets.filter((x) => x.exercise_id === exId).length,
+    [sets]
+  );
+  const isIncomplete = useCallback(
+    (p: PrescribedExercise) => setsCount(p.exercise_id) < p.default_sets,
+    [setsCount]
+  );
+
+  const activeId = useMemo(() => {
+    if (manualActiveId != null) {
+      const ex = prescribed.find((p) => p.exercise_id === manualActiveId);
+      if (ex && isIncomplete(ex)) return manualActiveId;
+    }
+    const first = prescribed.find(isIncomplete);
+    return first?.exercise_id ?? null;
+  }, [manualActiveId, prescribed, isIncomplete]);
+
+  const handleLogSet = async (
+    ex: PrescribedExercise,
+    setIdx: number,
+    weight: number,
+    reps: number
+  ) => {
+    // PR detection — only Set 1 counts per the design. Compare against all
+    // previous finished Set 1s; unfinished workouts (including this one)
+    // are excluded via the finished_at filter.
+    const prKinds =
+      setIdx === 0
+        ? await detectPRsForSet1(db, ex.exercise_id, weight, reps)
+        : [];
+
+    await addSet(db, workoutId, ex.exercise_id, setIdx + 1, reps, weight);
+    await reload();
+
+    // Figure out the label for the rest overlay.
+    const loggedAfter = setIdx + 1;
+    const willBeDone = loggedAfter >= ex.default_sets;
+    let label: string;
+    if (willBeDone) {
+      const idx = prescribed.findIndex((p) => p.exercise_id === ex.exercise_id);
+      const nextEx = prescribed
+        .slice(idx + 1)
+        .find((p) => setsCount(p.exercise_id) + 0 < p.default_sets);
+      label = nextEx
+        ? `${nextEx.exercise_name} · Set 1 of ${nextEx.default_sets}`
+        : "Last set done — finish up";
+    } else {
+      label = `${ex.exercise_name} · Set ${loggedAfter + 1} of ${ex.default_sets}`;
+    }
+
+    if (prKinds.length > 0) {
+      // Pick the highest-priority PR kind for the headline.
+      const kind: PRKind = prKinds.includes("weight")
+        ? "weight"
+        : prKinds.includes("rep")
+        ? "rep"
+        : "volume";
+      setCelebration({
+        kind,
+        exerciseName: ex.exercise_name,
+        value: `${weight} kg × ${reps}`,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Keep the celebration visible ~1.6 s, then start rest.
+      setTimeout(() => setCelebration(null), 1600);
+      setTimeout(() => {
+        rest.start({ seconds: ex.default_rest_seconds, label });
+      }, 1700);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await rest.start({ seconds: ex.default_rest_seconds, label });
+    }
+
+    // If this was the last set, clear any manual override so auto-advance picks up.
+    if (willBeDone) setManualActiveId(null);
+  };
+
+  const handleDeleteSet = async (setId: number) => {
+    await deleteSet(db, setId);
+    await reload();
+  };
+
+  const handleFinish = () => {
+    Alert.alert("Finish Workout", "Save and finish?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Finish",
+        onPress: async () => {
+          await finishWorkout(db, workoutId);
+          await rest.skip();
+          router.replace({
+            pathname: "/workout/summary",
+            params: { id: String(workoutId) },
+          });
+        },
+      },
+    ]);
+  };
+
+  const handleDiscard = () => {
+    Alert.alert("Discard Workout", "This can't be undone.", [
+      { text: "Keep Going", style: "cancel" },
+      {
+        text: "Discard",
+        style: "destructive",
+        onPress: async () => {
+          await deleteWorkout(db, workoutId);
+          await rest.skip();
+          router.back();
+        },
+      },
+    ]);
+  };
+
+  const totalPrescribed = prescribed.reduce((s, p) => s + p.default_sets, 0);
+  const completed = sets.length;
+
+  return (
+    <View style={m.root}>
+      <View style={m.top}>
+        <Text style={m.topTimer}>{fmt(elapsed)}</Text>
+        <Text style={m.topProgress}>
+          {completed} / {totalPrescribed || "?"} sets
+        </Text>
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: 24 }}
+      >
+        {prescribed.map((ex) => {
+          const logged = sets
+            .filter((x) => x.exercise_id === ex.exercise_id)
+            .sort((a, b) => a.set_number - b.set_number);
+          const done = logged.length >= ex.default_sets;
+          if (done)
+            return <DoneCard key={ex.id} ex={ex} logged={logged} />;
+          if (ex.exercise_id === activeId)
+            return (
+              <ActiveCard
+                key={ex.id}
+                ex={ex}
+                logged={logged}
+                lastSet={lastSetByEx.get(ex.exercise_id) ?? null}
+                lastSessionSets={
+                  lastSessionByEx.get(ex.exercise_id) ?? new Map()
+                }
+                deadliftMode={deadliftMode}
+                techniqueWeight={techniqueWeight}
+                onLogSet={(idx, w, r) => handleLogSet(ex, idx, w, r)}
+                onDeleteSet={handleDeleteSet}
+              />
+            );
+          return (
+            <PendingCard
+              key={ex.id}
+              ex={ex}
+              onActivate={() => setManualActiveId(ex.exercise_id)}
+            />
+          );
+        })}
+      </ScrollView>
+
+      <View style={m.bottom}>
+        <Pressable style={m.discardBtn} onPress={handleDiscard}>
+          <Text style={m.discardText}>Discard</Text>
+        </Pressable>
+        <Pressable style={m.finishBtn} onPress={handleFinish}>
+          <Text style={m.finishText}>Finish</Text>
+        </Pressable>
+      </View>
+
+      <RestTimerOverlay
+        rest={rest.state}
+        onAdjust={rest.adjust}
+        onSkip={rest.skip}
+      />
+
+      {celebration && (
+        <PrCelebration
+          visible
+          kind={celebration.kind}
+          exerciseName={celebration.exerciseName}
+          value={celebration.value}
+        />
+      )}
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────
+const m = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  top: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  topTimer: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  topProgress: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  bottom: {
+    flexDirection: "row",
+    padding: 12,
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  discardBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+  },
+  discardText: { color: colors.danger, fontWeight: "700", fontSize: 16 },
+  finishBtn: {
+    flex: 2,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.success,
+    alignItems: "center",
+  },
+  finishText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+});
+
+const c = StyleSheet.create({
+  card: {
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  cardActive: {
+    borderColor: "rgba(74,144,217,0.4)",
+    backgroundColor: "#0F141C",
+  },
+  cardDone: {
+    backgroundColor: "rgba(76,175,80,0.06)",
+    borderColor: "rgba(76,175,80,0.3)",
+  },
+  cardPending: {
+    opacity: 0.55,
+  },
+
+  hdr: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  name: { color: colors.text, fontSize: 17, fontWeight: "800", flex: 1 },
+  sub: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
+
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.accent,
+  },
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(76,175,80,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkText: { color: colors.success, fontSize: 14, fontWeight: "900" },
+
+  pill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: "rgba(74,144,217,0.14)",
+  },
+  pillText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  pillDone: { backgroundColor: "rgba(76,175,80,0.18)" },
+  pillDoneText: { color: colors.success },
+  pillPending: { backgroundColor: colors.surfaceLight },
+  pillPendingText: { color: colors.textSecondary },
+
+  deadBanner: {
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+  },
+  deadHeavy: {
+    backgroundColor: "rgba(74,144,217,0.12)",
+    borderLeftColor: colors.accent,
+  },
+  deadTech: {
+    backgroundColor: "rgba(255,167,38,0.12)",
+    borderLeftColor: colors.warning,
+  },
+  deadLabel: { fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },
+  deadSub: { color: colors.text, fontSize: 12, marginTop: 2 },
+
+  coach: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    paddingLeft: 10,
+    paddingVertical: 6,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  coachText: { color: colors.accent, fontSize: 13, fontWeight: "700" },
+
+  setsWrap: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+
+  colHeaders: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 6,
+    marginBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  colHeaderSet: {
+    width: 42,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    textAlign: "left",
+  },
+  colHeaderKg: {
+    width: 108,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+  colHeaderReps: {
+    flex: 1,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+    color: colors.textSecondary,
+    textAlign: "center",
+  },
+
+  setBlock: {
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.05)",
+  },
+  setBlockCurrent: {
+    backgroundColor: "rgba(74,144,217,0.14)",
+    borderWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(74,144,217,0.35)",
+    borderBottomColor: "rgba(74,144,217,0.35)",
+    borderRadius: 8,
+    marginHorizontal: -4,
+    marginVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  setBlockLast: {
+    borderBottomWidth: 0,
+  },
+  setInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  setLastInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  setLastInlineKg: {
+    width: 108,
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0.3,
+  },
+  setLastInlineReps: {
+    flex: 1,
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: 0.3,
+  },
+  setN: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    letterSpacing: 1.5,
+    width: 42,
+  },
+
+  chips: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 8 },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+
+});

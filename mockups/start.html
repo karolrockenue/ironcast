@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronLog — start screen directions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Space+Grotesk:wght@500;700&family=Fraunces:ital,wght@0,700;0,900;1,700&family=JetBrains+Mono:wght@400;500;700&family=Anton&family=Oswald:wght@400;600;700&family=Archivo+Black&family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #080808; color: #eee;
+    font-family: -apple-system, Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 32px 28px 12px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 { font-size: 28px; font-weight: 900; margin: 0; color: #fff; }
+  .lede {
+    color: #999; font-size: 14px; margin-top: 6px; max-width: 780px; line-height: 1.5;
+  }
+  .lede b { color: #fff; font-weight: 700; }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 24px 28px 60px;
+    max-width: 1600px; margin: 0 auto;
+  }
+
+  .wrap { display: flex; flex-direction: column; }
+  .wrap-hdr {
+    background: #161616; border-radius: 14px 14px 0 0; padding: 12px 14px;
+    border: 1px solid #222; border-bottom: 0;
+  }
+  .idx { font-size: 10px; letter-spacing: 2px; color: #777; font-weight: 700; }
+  .wrap-title { font-size: 14px; font-weight: 800; margin-top: 2px; color: #fff; }
+  .wrap-sub { font-size: 11px; color: #999; margin-top: 2px; }
+
+  .wrap-cap {
+    background: #161616; border-radius: 0 0 14px 14px; padding: 10px 14px 12px;
+    font-size: 11px; color: #bbb; line-height: 1.5;
+    border: 1px solid #222; border-top: 0;
+  }
+  .wrap-cap b { color: #fff; font-weight: 700; }
+
+  /* Phone — 9:19.5 aspect roughly */
+  .phone {
+    aspect-ratio: 9 / 19.5;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    text-align: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    border-left: 1px solid #222; border-right: 1px solid #222;
+  }
+  .phone .tap {
+    position: absolute;
+    bottom: 18px; left: 20px; right: 20px;
+    font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.35); font-weight: 700;
+    text-align: center;
+  }
+
+  /* ══════════════════════════════════════════════════
+     01 — Monolithic Wordmark
+     ══════════════════════════════════════════════════ */
+  .s01 { background: #000; }
+  .s01 .mark {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 42px;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .s01 .tag {
+    margin-top: 10px;
+    font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.5); font-weight: 700;
+  }
+
+  /* ══════════════════════════════════════════════════
+     02 — Lime Flash
+     ══════════════════════════════════════════════════ */
+  .s02 { background: #000; }
+  .s02 .mark {
+    font-family: "Anton", sans-serif;
+    font-size: 56px;
+    color: #CCFF00;
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+  .s02 .tag {
+    margin-top: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; color: #fff; font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .s02 .dividers {
+    position: absolute; top: 40px; bottom: 40px; left: 20px; right: 20px;
+    border-top: 3px solid #CCFF00; border-bottom: 3px solid #CCFF00;
+    pointer-events: none;
+  }
+
+  /* ══════════════════════════════════════════════════
+     03 — Heavy Serif Journal
+     ══════════════════════════════════════════════════ */
+  .s03 { background: #F7F3EA; color: #1A1A1A; }
+  .s03 .mark {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 48px; font-weight: 900;
+    letter-spacing: -1px; line-height: 0.95;
+    color: #1A1A1A;
+  }
+  .s03 .rule { width: 40px; height: 3px; background: #B8443A; margin: 14px auto; }
+  .s03 .tag {
+    font-family: Inter, sans-serif;
+    font-size: 10px; letter-spacing: 3px;
+    color: #7A7362; font-weight: 700;
+  }
+  .s03 .tap { color: rgba(0,0,0,0.35); }
+
+  /* ══════════════════════════════════════════════════
+     04 — Barbell I
+     ══════════════════════════════════════════════════ */
+  .s04 { background: #101010; }
+  .s04 .mark {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 38px;
+    color: #fff;
+    letter-spacing: -0.5px;
+    line-height: 1;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .s04 .mark svg { display: inline-block; vertical-align: middle; }
+  .s04 .tag {
+    margin-top: 12px;
+    font-size: 10px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.45); font-weight: 700;
+  }
+
+  /* ══════════════════════════════════════════════════
+     05 — Terminal
+     ══════════════════════════════════════════════════ */
+  .s05 {
+    background: #0A0F0A;
+    justify-content: flex-start; align-items: flex-start;
+    padding-top: 80px;
+  }
+  .s05 .term {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 18px; color: #7FFF7F;
+    font-weight: 500; text-align: left;
+  }
+  .s05 .term .prompt { color: #556;}
+  .s05 .term .cursor {
+    display: inline-block; width: 10px; height: 20px;
+    background: #7FFF7F; vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .s05 .scan {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0px, rgba(127,255,127,0.02) 1px, transparent 2px, transparent 4px);
+    pointer-events: none;
+  }
+
+  /* ══════════════════════════════════════════════════
+     06 — Stacked Brutalist
+     ══════════════════════════════════════════════════ */
+  .s06 { background: #0D0D0D; }
+  .s06 .line1 {
+    font-family: "Anton", sans-serif;
+    font-size: 66px; color: #fff;
+    line-height: 0.9;
+    letter-spacing: 2px;
+  }
+  .s06 .line2 {
+    font-family: "Anton", sans-serif;
+    font-size: 66px; color: #4A90D9;
+    line-height: 0.9;
+    letter-spacing: 2px;
+    margin-top: -4px;
+  }
+  .s06 .bar { width: 80px; height: 4px; background: #4A90D9; margin: 16px auto 0; }
+  .s06 .tag {
+    margin-top: 12px;
+    font-size: 9px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.45); font-weight: 700;
+  }
+
+  /* ══════════════════════════════════════════════════
+     07 — Iron Stamp (chiseled)
+     ══════════════════════════════════════════════════ */
+  .s07 {
+    background: #1A1712;
+  }
+  .s07 .mark {
+    font-family: "Barlow Condensed", sans-serif;
+    font-weight: 900;
+    font-size: 64px;
+    color: transparent;
+    -webkit-text-stroke: 2px rgba(220,180,110,0.85);
+    letter-spacing: 4px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 0 rgba(0,0,0,0.5));
+  }
+  .s07 .tag {
+    margin-top: 14px;
+    font-family: Inter, sans-serif;
+    font-size: 9px; letter-spacing: 5px;
+    color: rgba(220,180,110,0.7); font-weight: 700;
+  }
+
+  /* ══════════════════════════════════════════════════
+     08 — Minimalist lowercase
+     ══════════════════════════════════════════════════ */
+  .s08 { background: #0D0D0D; }
+  .s08 .dot {
+    width: 8px; height: 8px; border-radius: 4px;
+    background: #4A90D9; margin: 0 auto 14px;
+  }
+  .s08 .mark {
+    font-family: Inter, sans-serif;
+    font-size: 30px; font-weight: 500;
+    color: #F0F0F0;
+    letter-spacing: -1px;
+  }
+  .s08 .tag {
+    margin-top: 6px;
+    font-size: 10px; color: #777;
+    font-weight: 500;
+  }
+
+  /* ══════════════════════════════════════════════════
+     09 — Counter visual
+     ══════════════════════════════════════════════════ */
+  .s09 { background: #0A0A0A; }
+  .s09 .num {
+    font-family: "Space Mono", monospace;
+    font-size: 130px; line-height: 1;
+    color: #4A90D9; font-weight: 700;
+    letter-spacing: -4px;
+    text-shadow: 0 0 30px rgba(74,144,217,0.5);
+  }
+  .s09 .unit {
+    margin-top: -4px; font-size: 12px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.5); font-weight: 700;
+  }
+  .s09 .mark {
+    margin-top: 30px;
+    font-family: "Archivo Black", sans-serif;
+    font-size: 22px; color: #fff;
+    letter-spacing: 0;
+  }
+
+  /* ══════════════════════════════════════════════════
+     10 — Wordmark + tagline (classic)
+     ══════════════════════════════════════════════════ */
+  .s10 { background: #0D0D0D; }
+  .s10 .mark {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 40px; color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .s10 .tagline {
+    margin-top: 18px;
+    font-family: Inter, sans-serif;
+    font-size: 15px; font-weight: 700;
+    color: #4A90D9; line-height: 1.4;
+    max-width: 220px;
+  }
+  .s10 .subtag {
+    margin-top: 8px;
+    font-size: 11px; color: #888;
+    font-weight: 500; line-height: 1.4;
+  }
+
+  /* ══════════════════════════════════════════════════
+     11 — Vertical Spine
+     ══════════════════════════════════════════════════ */
+  .s11 {
+    background: #0D0D0D;
+    flex-direction: row; align-items: stretch; justify-content: flex-start;
+    padding: 0;
+  }
+  .s11 .spine {
+    width: 80px; background: #4A90D9;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .s11 .spine-text {
+    font-family: "Archivo Black", sans-serif;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    color: #000;
+    font-size: 32px;
+    letter-spacing: 3px;
+  }
+  .s11 .body {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; padding: 20px;
+    text-align: left;
+  }
+  .s11 .body .year {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; color: #4A90D9; font-weight: 700;
+    letter-spacing: 2px; margin-bottom: 8px;
+  }
+  .s11 .body .tagline {
+    font-family: Inter, sans-serif;
+    font-size: 16px; font-weight: 700; color: #fff;
+    line-height: 1.3;
+  }
+  .s11 .body .sub {
+    font-family: Inter, sans-serif;
+    font-size: 11px; color: #888;
+    margin-top: 8px; line-height: 1.4;
+  }
+
+  /* ══════════════════════════════════════════════════
+     12 — Neon glow (synthwave)
+     ══════════════════════════════════════════════════ */
+  .s12 {
+    background: radial-gradient(ellipse at center, #1A0A3A 0%, #0A0420 70%, #000 100%);
+  }
+  .s12 .mark {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 40px; letter-spacing: -0.5px;
+    color: #fff;
+    text-shadow:
+      0 0 8px #FF2EB0,
+      0 0 20px rgba(255,46,176,0.7),
+      0 0 40px rgba(255,46,176,0.4);
+  }
+  .s12 .tag {
+    margin-top: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 3px;
+    color: #00F0FF;
+    text-shadow: 0 0 6px rgba(0,240,255,0.6);
+    font-weight: 700;
+  }
+  .s12 .grid-lines {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,46,176,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,46,176,0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  /* ══════════════════════════════════════════════════
+     13 — Gym Ticket / Receipt
+     ══════════════════════════════════════════════════ */
+  .s13 {
+    background: #EFE9DC;
+    color: #1A1A1A;
+    padding: 24px;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .s13 .ticket {
+    background: #FFFBF0;
+    border: 1px dashed #1A1A1A;
+    padding: 24px 20px;
+    width: 100%; max-width: 220px;
+    text-align: left;
+  }
+  .s13 .ticket h2 {
+    font-family: "Barlow Condensed", sans-serif;
+    font-size: 28px; font-weight: 900;
+    letter-spacing: 1px; margin: 0 0 4px;
+    text-align: center; color: #1A1A1A;
+  }
+  .s13 .ticket .sub {
+    font-size: 10px; letter-spacing: 2px;
+    text-align: center; margin-bottom: 16px;
+    color: #666;
+  }
+  .s13 .ticket .dash {
+    border-top: 1px dashed #999; margin: 10px 0;
+  }
+  .s13 .ticket .row {
+    display: flex; justify-content: space-between;
+    font-size: 11px; margin-bottom: 4px;
+  }
+  .s13 .ticket .row .k { color: #888; }
+  .s13 .ticket .row .v { font-weight: 700; }
+  .s13 .tap { color: rgba(0,0,0,0.35); }
+
+  /* ══════════════════════════════════════════════════
+     14 — Hero + Tagline (marketing)
+     ══════════════════════════════════════════════════ */
+  .s14 { background: #0D0D0D; justify-content: flex-start; padding-top: 70px; }
+  .s14 .mark {
+    font-family: "Archivo Black", sans-serif;
+    font-size: 26px; color: #fff;
+    letter-spacing: 1px;
+  }
+  .s14 .hero {
+    margin-top: 48px;
+    font-family: Fraunces, Georgia, serif;
+    font-style: italic;
+    font-size: 34px; font-weight: 700;
+    line-height: 1.05; color: #fff;
+    letter-spacing: -1px;
+    max-width: 260px;
+  }
+  .s14 .hero em { color: #4A90D9; font-style: normal; }
+  .s14 .sub {
+    margin-top: 18px;
+    font-family: Inter, sans-serif;
+    font-size: 13px; color: #999; font-weight: 500;
+    max-width: 240px; line-height: 1.4;
+  }
+  .s14 .go {
+    margin-top: 32px;
+    background: #4A90D9; color: #fff;
+    padding: 12px 28px; border-radius: 30px;
+    font-family: Inter, sans-serif;
+    font-size: 13px; font-weight: 800; letter-spacing: 1px;
+  }
+
+  /* ══════════════════════════════════════════════════
+     15 — Duochrome split
+     ══════════════════════════════════════════════════ */
+  .s15 {
+    background: #0D0D0D;
+    flex-direction: row;
+    padding: 0;
+    justify-content: stretch; align-items: stretch;
+  }
+  .s15 .half {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-family: "Archivo Black", sans-serif;
+    font-size: 44px;
+    letter-spacing: -1px;
+  }
+  .s15 .half.l { background: #4A90D9; color: #0D0D0D; }
+  .s15 .half.r { background: #0D0D0D; color: #4A90D9; }
+  .s15 .tag-bottom {
+    position: absolute; bottom: 20px; left: 20px; right: 20px;
+    font-size: 9px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.5); font-weight: 700;
+    text-align: center;
+    mix-blend-mode: exclusion;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Start screen — 15 directions</h1>
+  <p class="lede">
+    The screen you see when the app opens (or the splash before it transitions to the
+    home feed). Fifteen identity treatments ranging from brutalist monolith to
+    editorial paper to synthwave neon. Pick one (or mix — "03's typography with
+    14's layout", etc.) and I'll wire it in as the app's real start screen.
+  </p>
+</header>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+  const S = [
+    {
+      title: "Monolithic Wordmark",
+      sub: "Archivo Black, black+white, minimal",
+      caption: "<b>Just the name.</b> Heavy sans wordmark on pure black. No imagery, no noise. The workout app equivalent of a barbell — one thing, done well. Reads as 'serious tool, no fluff'.",
+      body: `<div class="mark">IRONLOG</div><div class="tag">GUIDED TRAINING</div>`,
+      cls: "s01"
+    },
+    {
+      title: "Lime Flash",
+      sub: "Anton + lime, bar-wrapped",
+      caption: "<b>Neon sign.</b> Electric lime Anton wordmark between two horizontal bars — reads like a weight plate stamp or a barbell. Loud, visible, can't be missed in a dim gym. Matches the Brutalist Lime theme we tried earlier.",
+      body: `<div class="dividers"></div><div class="mark">IRONLOG</div><div class="tag">NO DECISIONS</div>`,
+      cls: "s02"
+    },
+    {
+      title: "Heavy Serif Journal",
+      sub: "Fraunces, cream light mode",
+      caption: "<b>Training journal.</b> Display serif on warm cream. Feels like the cover of a physical notebook, or a Moleskine. Lighter in tone, more personal, less 'gym bro'. Muted red accent.",
+      body: `<div class="mark">IronLog</div><div class="rule"></div><div class="tag">GUIDED TRAINING</div>`,
+      cls: "s03"
+    },
+    {
+      title: "Barbell Letter-I",
+      sub: "Iconified initial, editorial",
+      caption: "<b>Playful wordmark.</b> The \"I\" in IRON is a stylized barbell. Tiny detail but unmistakably on-theme. Use this if you want personality without going full cartoon.",
+      body: `
+        <div class="mark">
+          <svg width="22" height="42" viewBox="0 0 22 42" fill="none">
+            <rect x="1"  y="4"  width="4" height="34" fill="#CCFF00"/>
+            <rect x="9"  y="0"  width="4" height="42" fill="#fff"/>
+            <rect x="17" y="4"  width="4" height="34" fill="#CCFF00"/>
+          </svg>RONLOG</div>
+        <div class="tag">LIFT. LOG. REPEAT.</div>`,
+      cls: "s04"
+    },
+    {
+      title: "Terminal",
+      sub: "Mono green-on-black, blinking cursor",
+      caption: "<b>Hacker aesthetic.</b> Matrix-style mono green on black. The entire app renders like a terminal session. Niche but distinctive; probably a dev's favorite.",
+      body: `<div class="scan"></div><div class="term"><span class="prompt">$</span> ironlog<span class="cursor"></span></div>`,
+      cls: "s05"
+    },
+    {
+      title: "Stacked Brutalist",
+      sub: "IRON + LOG, two-toned",
+      caption: "<b>Poster scale.</b> Massive two-line wordmark, Anton condensed, with a color split. Visually loud without any imagery. Feels like a Soviet gym mural.",
+      body: `<div class="line1">IRON</div><div class="line2">LOG</div><div class="bar"></div><div class="tag">ALT A · B · A · B</div>`,
+      cls: "s06"
+    },
+    {
+      title: "Iron Stamp",
+      sub: "Chiseled outline, warm dark",
+      caption: "<b>Monument.</b> Outline-only condensed sans, bronze-gold color on dark warm background. Looks like it's engraved in plate. The most \"heavy iron\" identity of the set.",
+      body: `<div class="mark">IRONLOG</div><div class="tag">GUIDED STRENGTH</div>`,
+      cls: "s07"
+    },
+    {
+      title: "Minimalist lowercase",
+      sub: "system sans, tiny blue dot",
+      caption: "<b>Quiet product.</b> Lowercase \"ironlog\" with a small accent dot above. Feels like a Linear / Notion tool. Almost no personality — lets the rest of the app do the talking.",
+      body: `<div class="dot"></div><div class="mark">ironlog</div><div class="tag">guided training</div>`,
+      cls: "s08"
+    },
+    {
+      title: "Counter Visual",
+      sub: "Huge timer as brand moment",
+      caption: "<b>Numbers-first.</b> Leads with a massive 2:30 (rest timer) in mono. Wordmark sits below. Makes the app's core mechanic — timed rests — part of the identity.",
+      body: `<div class="num">2:30</div><div class="unit">REST</div><div class="mark">IRONLOG</div>`,
+      cls: "s09"
+    },
+    {
+      title: "Wordmark + tagline",
+      sub: "Classic splash with positioning",
+      caption: "<b>Pitch-ready.</b> Wordmark followed by an accent-colored tagline and secondary line. Most conventional; looks like a real startup landing. Safe and polished.",
+      body: `<div class="mark">IRONLOG</div><div class="tagline">Your workout.<br/>No thinking required.</div><div class="subtag">Alternate A &amp; B. Auto-progress. Guided rests.</div>`,
+      cls: "s10"
+    },
+    {
+      title: "Vertical Spine",
+      sub: "Accent spine + body copy",
+      caption: "<b>Magazine layout.</b> Blue vertical bar down the left runs the brand name, body copy on the right. Editorial and distinct — feels like a table of contents page.",
+      body: `
+        <div class="spine"><div class="spine-text">IRONLOG</div></div>
+        <div class="body">
+          <div class="year">EST. 2026</div>
+          <div class="tagline">Guided workouts.<br/>Auto-progression.<br/>No thinking.</div>
+          <div class="sub">Alternate A and B. The app tells you what to lift and when to rest.</div>
+        </div>`,
+      cls: "s11"
+    },
+    {
+      title: "Neon Glow",
+      sub: "Synthwave gradient + pink/cyan",
+      caption: "<b>Loudest.</b> Purple radial background, grid lines, pink glow on the wordmark, cyan tagline. Emotional and memorable but probably overkill for everyday use.",
+      body: `<div class="grid-lines"></div><div class="mark">IRONLOG</div><div class="tag">GUIDED STRENGTH</div>`,
+      cls: "s12"
+    },
+    {
+      title: "Gym Ticket",
+      sub: "Mono receipt with dashed border",
+      caption: "<b>Locker stub.</b> Styled like a gym entry ticket or a weigh-in receipt. Dashed borders, mono font, tiny numeric details. Novel and unlike any fitness app, but more busy than most.",
+      body: `
+        <div class="ticket">
+          <h2>IRONLOG</h2>
+          <div class="sub">·  MEMBER SESSION  ·</div>
+          <div class="dash"></div>
+          <div class="row"><span class="k">MEMBER #</span><span class="v">0001</span></div>
+          <div class="row"><span class="k">PLAN</span><span class="v">A / B</span></div>
+          <div class="row"><span class="k">SCHED</span><span class="v">AUTO</span></div>
+          <div class="dash"></div>
+          <div class="row"><span class="k">STATUS</span><span class="v">READY</span></div>
+        </div>`,
+      cls: "s13"
+    },
+    {
+      title: "Hero + Tagline",
+      sub: "Italic serif hero, CTA button",
+      caption: "<b>Marketing page vibe.</b> Small wordmark at top, giant italic serif tagline in the middle, accent text, then a pill CTA button. Most emotional; also most \"I'm selling something\".",
+      body: `
+        <div class="mark">IRONLOG</div>
+        <div class="hero"><em>Lift.</em> Log. Let<br/>the app think.</div>
+        <div class="sub">Workouts A and B, alternated automatically. Auto-progression, auto-rest. You just lift.</div>
+        <div class="go">START TRAINING →</div>`,
+      cls: "s14"
+    },
+    {
+      title: "Duochrome Split",
+      sub: "Two-panel I / L",
+      caption: "<b>Graphic identity.</b> Screen split vertically; left panel accent-colored background with dark letter, right panel dark background with accent letter. Reads as \"I\" + \"L\" (IronLog initials). Maximalist in geometry, minimal in content.",
+      body: `<div class="half l">I</div><div class="half r">L</div><div class="tag-bottom">IRONLOG · GUIDED TRAINING</div>`,
+      cls: "s15"
+    },
+  ];
+
+  document.getElementById('gallery').innerHTML = S.map((s, i) => `
+    <div class="wrap">
+      <div class="wrap-hdr">
+        <div class="idx">START ${String(i + 1).padStart(2, '0')}</div>
+        <div class="wrap-title">${s.title}</div>
+        <div class="wrap-sub">${s.sub}</div>
+      </div>
+      <div class="phone ${s.cls}">
+        ${s.body}
+        <div class="tap">TAP TO CONTINUE</div>
+      </div>
+      <div class="wrap-cap">${s.caption}</div>
+    </div>
+  `).join('');
+</script>
+</body>
+</html>
