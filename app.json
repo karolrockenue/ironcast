@@ -14,7 +14,7 @@
       "backgroundColor": "#0D0D0D"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.karolmarcu.ironlog",
       "buildNumber": "1",
       "infoPlist": {

@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IronCast — App Store Screenshots (1242 × 2688)</title>
+<style>
+  :root {
+    --bg: #0D0D0D;
+    --surface: #1A1A1A;
+    --surfaceLight: #252525;
+    --border: #333333;
+    --text: #F5F5F5;
+    --muted: #999999;
+    --accent: #4A90D9;
+    --accentLight: #6AA8E8;
+    --success: #4CAF50;
+    --warning: #FFA726;
+    --danger: #E05555;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #222;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .help {
+    max-width: 780px;
+    margin: 40px auto 24px;
+    padding: 20px 24px;
+    background: #111;
+    border-radius: 10px;
+    line-height: 1.55;
+    font-size: 14px;
+    color: #ddd;
+  }
+  .help h1 { margin: 0 0 10px; font-size: 15px; letter-spacing: 2px; color: var(--accent); }
+  .help code { background: #000; padding: 2px 6px; border-radius: 4px; color: #9cf; }
+
+  .sheet {
+    display: flex; flex-wrap: wrap; gap: 32px;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  /* Each mock is exactly 1242 × 2688 px */
+  .mock {
+    width: 1242px;
+    height: 2688px;
+    position: relative;
+    background: var(--bg);
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  }
+  /* scale everything inside by 3× — we design at logical points (414 × 896) */
+  .inner {
+    position: absolute;
+    top: 0; left: 0;
+    width: 414px;
+    height: 896px;
+    transform: scale(3);
+    transform-origin: top left;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  /* iOS status bar */
+  .ios-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    font-variant: tabular-nums;
+  }
+  .ios-bar .icons { display: flex; gap: 5px; align-items: center; }
+  .sig { display: inline-block; width: 17px; height: 11px; }
+  .wifi { display: inline-block; width: 16px; height: 11px; }
+  .batt {
+    width: 24px; height: 11px;
+    border: 1px solid #fff;
+    border-radius: 2.5px;
+    position: relative;
+    padding: 1px;
+  }
+  .batt::after {
+    content: "";
+    position: absolute;
+    top: 3px; right: -3px;
+    width: 1.5px; height: 4px;
+    background: #fff;
+    border-radius: 1px;
+  }
+  .batt .fill { display: block; height: 100%; background: #fff; width: 85%; border-radius: 1px; }
+
+  /* ----------- SHARED APP STYLES ----------- */
+  .screen { padding: 16px; }
+
+  .header {
+    padding: 16px 18px 10px;
+  }
+  .brand {
+    font-family: Impact, "Arial Narrow", sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    letter-spacing: 1.5px;
+    color: var(--text);
+  }
+  .brand .cast { color: var(--accent); }
+  .today {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Tab bar */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 82px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-top: 8px;
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 0;
+  }
+  .tab svg { width: 22px; height: 22px; }
+  .tab .label {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+  }
+  .tab.active .label { color: var(--accent); }
+  .tab.inactive .label { color: var(--muted); }
+
+  /* Generic cards */
+  .card {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .label {
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* ----------- SCREEN 1: HOME (Journal) ----------- */
+  .next-card {
+    background: var(--surface);
+    border: 2px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px;
+    margin: 6px 16px 16px;
+  }
+  .next-up-label { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 2px; }
+  .next-workout { color: var(--text); font-size: 22px; font-weight: 900; margin-top: 4px; letter-spacing: 0.5px; }
+  .next-meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .dl-mode {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(74, 144, 217, 0.12);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .start-btn {
+    margin-top: 14px;
+    background: var(--accent);
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    color: #0D0D0D;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+  }
+  .past-label {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin: 4px 16px 8px;
+  }
+  .past {
+    background: var(--surface);
+    margin: 0 16px 8px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .past-name { color: var(--text); font-size: 14px; font-weight: 700; }
+  .past-date { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .past-stats { color: var(--text); font-size: 12px; font-weight: 700; text-align: right; }
+  .past-stats-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+  /* ----------- SCREEN 2: ACTIVE WORKOUT ----------- */
+  .nav-header {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-header .cancel { color: var(--accent); font-size: 15px; font-weight: 600; }
+  .nav-header .title { color: var(--text); font-size: 16px; font-weight: 700; }
+  .nav-header .spacer { width: 50px; }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    position: relative;
+  }
+  .progress-bar .fill {
+    position: absolute;
+    top: 0; left: 0; height: 100%;
+    background: var(--accent);
+    width: 14%;
+  }
+
+  .ex-card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 14px;
+    margin: 10px 16px;
+  }
+  .ex-card.active {
+    border: 1px solid var(--accent);
+    background: #152032;
+  }
+  .ex-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .ex-name {
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+  }
+  .ex-sub {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .ex-rest {
+    background: var(--surfaceLight);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .set-cols {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 60px;
+    gap: 8px;
+    padding: 6px 4px;
+    align-items: center;
+  }
+  .col-head {
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+  }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 60px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 4px;
+    border-top: 1px solid var(--border);
+  }
+  .set-row.highlight {
+    background: rgba(74,144,217,0.08);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 10px 6px;
+    margin: 4px 0;
+  }
+  .set-num {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+  }
+  .stepper {
+    background: var(--surfaceLight);
+    border-radius: 8px;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 36px;
+  }
+  .stepper .val {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 800;
+    font-variant: tabular-nums;
+  }
+  .stepper .sym {
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .stepper .val.green { color: var(--success); }
+  .stepper .val.blue { color: var(--accent); }
+  .log-btn {
+    background: var(--accent);
+    color: #0D0D0D;
+    border-radius: 8px;
+    text-align: center;
+    padding: 8px 0;
+    font-weight: 900;
+    font-size: 11px;
+    letter-spacing: 1.2px;
+    height: 36px;
+    line-height: 20px;
+  }
+  .log-btn.done {
+    background: transparent;
+    color: var(--success);
+    border: 1px solid var(--success);
+  }
+  .last-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 60px;
+    gap: 8px;
+    padding: 2px 4px 8px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    font-variant: tabular-nums;
+  }
+  .last-row div { text-align: center; }
+
+  .ex-card.pending .ex-name { color: var(--muted); }
+
+  /* ----------- SCREEN 3: REST TIMER ----------- */
+  .rest-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 82px;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 40px;
+  }
+  .rest-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+  }
+  .rest-ex {
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 36px;
+  }
+  .rest-ring {
+    position: relative;
+    width: 240px;
+    height: 240px;
+  }
+  .rest-time {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .rest-time .big {
+    color: var(--text);
+    font-size: 56px;
+    font-weight: 900;
+    font-variant: tabular-nums;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .rest-time .small {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+    font-variant: tabular-nums;
+  }
+  .rest-controls {
+    margin-top: 48px;
+    display: flex;
+    gap: 14px;
+  }
+  .rest-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .rest-btn.skip {
+    background: var(--accent);
+    color: #0D0D0D;
+    border: 0;
+  }
+
+  /* ----------- SCREEN 4: SUMMARY ----------- */
+  .sum-title {
+    text-align: center;
+    padding: 20px 16px 12px;
+  }
+  .sum-title .crown {
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+  }
+  .sum-title .h {
+    color: var(--text);
+    font-size: 24px;
+    font-weight: 900;
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
+  .sum-title .sub {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  .sum-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 8px 16px 16px;
+  }
+  .sum-stat {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 14px 8px;
+    text-align: center;
+  }
+  .sum-stat .v {
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 900;
+    font-variant: tabular-nums;
+  }
+  .sum-stat .l {
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    margin-top: 4px;
+  }
+  .sum-section-label {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin: 14px 16px 8px;
+  }
+  .pr-item {
+    background: var(--surface);
+    margin: 0 16px 8px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .pr-badge {
+    width: 36px; height: 36px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-family: Impact, sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+  .pr-meta { flex: 1; }
+  .pr-meta .n { color: var(--text); font-size: 14px; font-weight: 800; }
+  .pr-meta .k { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 1.2px; margin-top: 2px; }
+  .pr-val {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 900;
+    font-variant: tabular-nums;
+  }
+  .next-dl {
+    background: var(--surface);
+    margin: 6px 16px 10px;
+    border-radius: 10px;
+    padding: 14px;
+    border-left: 3px solid var(--accent);
+  }
+  .next-dl .t { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+  .next-dl .v { color: var(--text); font-size: 16px; font-weight: 800; margin-top: 4px; }
+  .next-dl .v .blu { color: var(--accent); }
+
+  /* ----------- SCREEN 5: PROGRESS ----------- */
+  .hero {
+    border: 2px solid var(--accent);
+    margin: 10px 16px 16px;
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .hero-l {
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+  }
+  .hero-v {
+    color: var(--accent);
+    font-family: Impact, sans-serif;
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    line-height: 54px;
+    margin-top: 4px;
+  }
+  .hero-bar {
+    width: 36px;
+    height: 2px;
+    background: var(--accent);
+    margin: 12px auto;
+  }
+  .hero-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .hero-meta { text-align: center; }
+  .hero-meta .v { color: var(--text); font-size: 16px; font-weight: 900; }
+  .hero-meta .l { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: 1.5px; margin-top: 2px; }
+  .hero-divider { width: 1px; height: 22px; background: var(--border); }
+  .hero-foot { color: var(--muted); font-size: 10px; margin-top: 10px; }
+
+  .sec {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin: 18px 16px 8px;
+  }
+  .thead {
+    display: flex;
+    padding: 0 24px 6px;
+    border-bottom: 1px solid var(--border);
+    margin: 0 16px;
+  }
+  .thead .h {
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 1.3px;
+  }
+  .tbody {
+    background: var(--surface);
+    margin: 0 16px;
+  }
+  .trow {
+    display: flex;
+    padding: 10px 12px;
+    border-bottom: 0.5px solid var(--border);
+    align-items: center;
+  }
+  .trow:last-child { border-bottom: 0; }
+  .flex1 { flex: 1; }
+  .pr-name {
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .num-cell {
+    width: 56px;
+    text-align: right;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    font-variant: tabular-nums;
+  }
+  .unit {
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="help">
+  <h1>HOW TO EXPORT THESE</h1>
+  Each screen below is an exact <code>1242 × 2688 px</code> block.<br/>
+  In <b>Chrome</b>: right-click a screen → <b>Inspect</b>, hover the matching <code>&lt;div class="mock"&gt;</code> element in the panel, click the <b>⋮</b> menu (three dots) at the top of the DOM tree → <b>Capture node screenshot</b>. Saves a PNG at the right size.<br/>
+  Repeat for each screen. Upload to App Store Connect in this order: splash, home, active workout, rest timer, summary, progress.
+</div>
+
+<div class="sheet">
+
+  <!-- ===================== SCREEN 0 · SPLASH ===================== -->
+  <div class="mock" id="screen-splash">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0"  y="7" width="3" height="4" fill="#fff"/><rect x="4"  y="5" width="3" height="6" fill="#fff"/><rect x="8"  y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div style="
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: var(--bg);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+      ">
+        <div style="text-align: center;">
+          <div style="font-family: Impact, 'Arial Narrow', sans-serif; font-weight: 900; color: var(--text); font-size: 96px; letter-spacing: 4px; line-height: 0.9;">IRON</div>
+          <div style="font-family: Impact, 'Arial Narrow', sans-serif; font-weight: 900; color: var(--accent); font-size: 96px; letter-spacing: 4px; line-height: 0.9; margin-top: -4px;">CAST</div>
+        </div>
+        <div style="width: 88px; height: 4px; background: var(--accent); margin-top: 22px;"></div>
+        <div style="color: rgba(255,255,255,0.45); font-size: 11px; letter-spacing: 3px; font-weight: 700; margin-top: 16px;">STRENGTH TRAINING LOG</div>
+        <div style="color: rgba(255,255,255,0.30); font-size: 10px; letter-spacing: 3px; font-weight: 700; margin-top: 6px;">ALT A · B · A · B</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 1 · HOME ===================== -->
+  <div class="mock" id="screen-home">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>9:41</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0"  y="7" width="3" height="4" fill="#fff"/><rect x="4"  y="5" width="3" height="6" fill="#fff"/><rect x="8"  y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div class="header">
+        <div class="brand">Iron<span class="cast">Cast</span></div>
+        <div class="today">Sunday · 20 April</div>
+      </div>
+
+      <!-- Next up -->
+      <div style="padding: 0 16px 4px;">
+        <div class="next-up-label" style="color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: 2px;">NEXT UP</div>
+      </div>
+      <div class="next-card">
+        <div style="color: var(--text); font-family: Impact, sans-serif; font-size: 28px; font-weight: 900; letter-spacing: 1px; line-height: 1;">WORKOUT B</div>
+        <div style="color: var(--muted); font-size: 11px; margin-top: 6px; letter-spacing: 0.5px;">PULL · SHOULDERS · BICEPS · 7 exercises</div>
+        <div style="margin-top: 10px; padding: 8px 10px; background: rgba(74, 144, 217, 0.12); border-radius: 8px; font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 0.5px;">
+          Deadlift: Technique Day · 70 kg × 2
+        </div>
+        <div class="start-btn">START WORKOUT ›</div>
+      </div>
+
+      <div class="past-label">RECENT SESSIONS</div>
+
+      <div class="past">
+        <div>
+          <div class="past-name">Workout A · Push + Quads</div>
+          <div class="past-date">Apr 18 · 2 days ago</div>
+        </div>
+        <div>
+          <div class="past-stats">8.4t · 49 min</div>
+          <div class="past-stats-sub">2 PRs</div>
+        </div>
+      </div>
+
+      <div class="past">
+        <div>
+          <div class="past-name">Workout B · Heavy</div>
+          <div class="past-date">Apr 15 · 5 days ago</div>
+        </div>
+        <div>
+          <div class="past-stats">6.8t · 48 min</div>
+          <div class="past-stats-sub">1 PR</div>
+        </div>
+      </div>
+
+      <div class="past">
+        <div>
+          <div class="past-name">Workout A · Push + Quads</div>
+          <div class="past-date">Apr 12 · 8 days ago</div>
+        </div>
+        <div>
+          <div class="past-stats">7.9t · 52 min</div>
+          <div class="past-stats-sub">—</div>
+        </div>
+      </div>
+
+      <div class="past">
+        <div>
+          <div class="past-name">Workout B · Technique</div>
+          <div class="past-date">Apr 9 · 11 days ago</div>
+        </div>
+        <div>
+          <div class="past-stats">5.1t · 41 min</div>
+          <div class="past-stats-sub">—</div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="tabbar">
+        <div class="tab active">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="1.5" y="8" width="2.5" height="8" rx=".6" stroke="#4A90D9" stroke-width="2.4"/>
+            <rect x="5" y="6" width="2.5" height="12" rx=".6" stroke="#4A90D9" stroke-width="2.4"/>
+            <rect x="16.5" y="6" width="2.5" height="12" rx=".6" stroke="#4A90D9" stroke-width="2.4"/>
+            <rect x="20" y="8" width="2.5" height="8" rx=".6" stroke="#4A90D9" stroke-width="2.4"/>
+            <path d="M7.5 12 H16.5" stroke="#4A90D9" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+          <span class="label">WORKOUT</span>
+        </div>
+        <div class="tab inactive">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3.5 8.5 A8.5 8.5 0 1 1 3.5 13.5" stroke="#999" stroke-width="1.9" stroke-linecap="round"/>
+            <polyline points="3.5,4 3.5,8.5 8,8.5" stroke="#999" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <polyline points="12,7 12,12 15.5,14" stroke="#999" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span class="label">HISTORY</span>
+        </div>
+        <div class="tab inactive">
+          <svg viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="13" width="3.5" height="8" rx=".6" stroke="#999" stroke-width="1.9"/>
+            <rect x="10.25" y="9" width="3.5" height="12" rx=".6" stroke="#999" stroke-width="1.9"/>
+            <rect x="17.5" y="5" width="3.5" height="16" rx=".6" stroke="#999" stroke-width="1.9"/>
+          </svg>
+          <span class="label">PROGRESS</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 2 · ACTIVE WORKOUT ===================== -->
+  <div class="mock" id="screen-active">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>9:47</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" fill="#fff"/><rect x="4" y="5" width="3" height="6" fill="#fff"/><rect x="8" y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div class="nav-header">
+        <span class="cancel">Cancel</span>
+        <span class="title">Workout B</span>
+        <span class="spacer"></span>
+      </div>
+      <div class="progress-bar"><div class="fill" style="width: 14%;"></div></div>
+
+      <!-- Active card: Deadlift Technique -->
+      <div class="ex-card active">
+        <div class="ex-header">
+          <div>
+            <div class="ex-name">Deadlift</div>
+            <div class="ex-sub">TECHNIQUE · 2 × 3–5 · 75% of last heavy</div>
+          </div>
+          <div class="ex-rest">3:00 REST</div>
+        </div>
+
+        <div class="set-cols">
+          <span class="col-head">SET</span>
+          <span class="col-head" style="text-align: center;">WEIGHT</span>
+          <span class="col-head" style="text-align: center;">REPS</span>
+          <span class="col-head"></span>
+        </div>
+
+        <div class="set-row highlight">
+          <div class="set-num">1</div>
+          <div class="stepper"><span class="sym">−</span><span class="val blue">70</span><span class="sym">+</span></div>
+          <div class="stepper"><span class="sym">−</span><span class="val green">4</span><span class="sym">+</span></div>
+          <div class="log-btn">LOG</div>
+        </div>
+        <div class="last-row">
+          <div></div>
+          <div>last · 95 kg</div>
+          <div>last · 4</div>
+          <div></div>
+        </div>
+
+        <div class="set-row">
+          <div class="set-num">2</div>
+          <div class="stepper"><span class="val" style="color: var(--muted);">70</span></div>
+          <div class="stepper"><span class="val" style="color: var(--muted);">—</span></div>
+          <div class="log-btn" style="background: var(--surfaceLight); color: var(--muted);">LOG</div>
+        </div>
+        <div class="last-row">
+          <div></div>
+          <div>last · —</div>
+          <div>last · —</div>
+          <div></div>
+        </div>
+      </div>
+
+      <!-- Pending cards -->
+      <div class="ex-card pending">
+        <div class="ex-header">
+          <div>
+            <div class="ex-name">Shoulder Press (Machine)</div>
+            <div class="ex-sub" style="color: var(--muted);">2 × 5–8 · 2:30 rest · Suggest 80 kg</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ex-card pending">
+        <div class="ex-header">
+          <div>
+            <div class="ex-name">Lat Pulldown (Cable)</div>
+            <div class="ex-sub" style="color: var(--muted);">2 × 5–8 · 2:30 rest · Suggest 55 kg</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ex-card pending">
+        <div class="ex-header">
+          <div>
+            <div class="ex-name">Seated Row (Machine)</div>
+            <div class="ex-sub" style="color: var(--muted);">2 × 6–10 · 2:00 rest · Suggest 60 kg</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ex-card pending">
+        <div class="ex-header">
+          <div>
+            <div class="ex-name">Bicep Curl (Dumbbell)</div>
+            <div class="ex-sub" style="color: var(--muted);">2 × 8–12 · 1:15 rest · Suggest 12 kg</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 3 · REST TIMER ===================== -->
+  <div class="mock" id="screen-rest">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>9:52</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" fill="#fff"/><rect x="4" y="5" width="3" height="6" fill="#fff"/><rect x="8" y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div class="rest-overlay">
+        <div class="rest-label">REST</div>
+        <div class="rest-ex">Deadlift · after Set 1</div>
+
+        <div class="rest-ring">
+          <svg width="240" height="240" viewBox="0 0 240 240">
+            <circle cx="120" cy="120" r="108" stroke="#333" stroke-width="8" fill="none"/>
+            <circle cx="120" cy="120" r="108" stroke="#4A90D9" stroke-width="8" fill="none"
+              stroke-dasharray="678.58" stroke-dashoffset="190"
+              stroke-linecap="round"
+              transform="rotate(-90 120 120)"/>
+          </svg>
+          <div class="rest-time">
+            <div class="big">2:15</div>
+            <div class="small">of 3:00</div>
+          </div>
+        </div>
+
+        <div class="rest-controls">
+          <div class="rest-btn">− 30 s</div>
+          <div class="rest-btn skip">SKIP ›</div>
+          <div class="rest-btn">+ 30 s</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 4 · SUMMARY ===================== -->
+  <div class="mock" id="screen-summary">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>10:38</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" fill="#fff"/><rect x="4" y="5" width="3" height="6" fill="#fff"/><rect x="8" y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div class="sum-title">
+        <div class="crown">SESSION COMPLETE</div>
+        <div class="h">WORKOUT B · TECHNIQUE</div>
+        <div class="sub">Sunday, 20 April · 51 minutes</div>
+      </div>
+
+      <div class="sum-stats">
+        <div class="sum-stat"><div class="v">7</div><div class="l">EXERCISES</div></div>
+        <div class="sum-stat"><div class="v">14</div><div class="l">SETS</div></div>
+        <div class="sum-stat"><div class="v">6.4t</div><div class="l">VOLUME</div></div>
+      </div>
+
+      <div class="sum-section-label">PERSONAL RECORDS · 2</div>
+
+      <div class="pr-item">
+        <div class="pr-badge">PR</div>
+        <div class="pr-meta">
+          <div class="n">Shoulder Press (Machine)</div>
+          <div class="k">NEW WEIGHT RECORD</div>
+        </div>
+        <div class="pr-val">82.5 kg × 6</div>
+      </div>
+
+      <div class="pr-item">
+        <div class="pr-badge">PR</div>
+        <div class="pr-meta">
+          <div class="n">Seated Row (Machine)</div>
+          <div class="k">NEW REP RECORD</div>
+        </div>
+        <div class="pr-val">60 kg × 10</div>
+      </div>
+
+      <div class="sum-section-label">PROGRESSION · NEXT SESSION</div>
+
+      <div class="next-dl">
+        <div class="t">NEXT DEADLIFT</div>
+        <div class="v"><span class="blu">HEAVY DAY</span> · progression from 95 kg</div>
+      </div>
+
+      <div style="padding: 0 16px;">
+        <div style="background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--text); font-size: 13px; font-weight: 700;">Shoulder Press</div>
+            <div style="color: var(--success); font-size: 12px; font-weight: 800;">↑ 80 → 82.5 kg</div>
+          </div>
+        </div>
+        <div style="background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--text); font-size: 13px; font-weight: 700;">Lat Pulldown</div>
+            <div style="color: var(--muted); font-size: 12px; font-weight: 800;">55 kg · push reps</div>
+          </div>
+        </div>
+        <div style="background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--text); font-size: 13px; font-weight: 700;">Bicep Curl</div>
+            <div style="color: var(--success); font-size: 12px; font-weight: 800;">↑ 12 → 13 kg</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN 5 · PROGRESS ===================== -->
+  <div class="mock" id="screen-progress">
+    <div class="inner">
+
+      <div class="ios-bar">
+        <span>11:14</span>
+        <span class="icons">
+          <svg class="sig" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" fill="#fff"/><rect x="4" y="5" width="3" height="6" fill="#fff"/><rect x="8" y="3" width="3" height="8" fill="#fff"/><rect x="12" y="0" width="3" height="11" fill="#fff"/></svg>
+          <svg class="wifi" viewBox="0 0 16 11"><path d="M8 0c2.9 0 5.5 1.1 7.5 2.9l-1.4 1.4C12.5 2.9 10.4 2 8 2S3.5 2.9 1.9 4.3L.5 2.9C2.5 1.1 5.1 0 8 0zm0 4c1.7 0 3.2.6 4.4 1.7l-1.4 1.4c-.8-.7-1.9-1.1-3-1.1S5.8 6.4 5 7.1L3.6 5.7C4.8 4.6 6.3 4 8 4zm0 4c.8 0 1.5.3 2 .8L8 11 6 8.8c.5-.5 1.2-.8 2-.8z" fill="#fff"/></svg>
+          <span class="batt"><span class="fill"></span></span>
+        </span>
+      </div>
+
+      <div class="nav-header" style="border-bottom: 0;">
+        <span class="spacer"></span>
+        <span class="title">Progress</span>
+        <span class="spacer"></span>
+      </div>
+
+      <div class="hero">
+        <div class="hero-l">TOTAL VOLUME LIFTED</div>
+        <div class="hero-v">47.3t</div>
+        <div class="hero-bar"></div>
+        <div class="hero-row">
+          <div class="hero-meta"><div class="v">14</div><div class="l">SESSIONS</div></div>
+          <div class="hero-divider"></div>
+          <div class="hero-meta"><div class="v">11.2h</div><div class="l">TIME</div></div>
+          <div class="hero-divider"></div>
+          <div class="hero-meta"><div class="v">3</div><div class="l">THIS WEEK</div></div>
+        </div>
+        <div class="hero-foot">8 sessions in the last 30 days</div>
+      </div>
+
+      <div class="sec">ALL-TIME PERSONAL RECORDS</div>
+      <div class="thead">
+        <div class="h flex1">EXERCISE</div>
+        <div class="h" style="width: 56px; text-align: right;">WEIGHT</div>
+        <div class="h" style="width: 56px; text-align: right;">REPS</div>
+        <div class="h" style="width: 56px; text-align: right;">VOL</div>
+      </div>
+      <div class="tbody">
+        <div class="trow"><div class="flex1"><div class="pr-name">Deadlift</div></div>
+          <div class="num-cell">95<span class="unit"> kg</span></div><div class="num-cell">5</div><div class="num-cell">475kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Shoulder Press</div></div>
+          <div class="num-cell">82.5<span class="unit"> kg</span></div><div class="num-cell">6</div><div class="num-cell">495kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Hack Squat</div></div>
+          <div class="num-cell">15<span class="unit"> kg</span></div><div class="num-cell">8</div><div class="num-cell">120kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Bench Press (Smith)</div></div>
+          <div class="num-cell">57.5<span class="unit"> kg</span></div><div class="num-cell">8</div><div class="num-cell">460kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Lat Pulldown</div></div>
+          <div class="num-cell">60<span class="unit"> kg</span></div><div class="num-cell">7</div><div class="num-cell">420kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Seated Row</div></div>
+          <div class="num-cell">60<span class="unit"> kg</span></div><div class="num-cell">10</div><div class="num-cell">600kg</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Bicep Curl (DB)</div></div>
+          <div class="num-cell">13<span class="unit"> kg</span></div><div class="num-cell">10</div><div class="num-cell">130kg</div></div>
+      </div>
+
+      <div class="sec">CURRENT WORKING WEIGHTS</div>
+      <div class="thead">
+        <div class="h flex1">EXERCISE</div>
+        <div class="h" style="width: 100px; text-align: right;">LAST SET</div>
+      </div>
+      <div class="tbody">
+        <div class="trow"><div class="flex1"><div class="pr-name">Deadlift</div><div style="color: var(--muted); font-size: 10px; margin-top: 2px;">Apr 20</div></div>
+          <div style="width: 100px; text-align: right; color: var(--text); font-weight: 800; font-size: 12px;">70<span class="unit"> kg</span><span class="unit"> × </span>5</div></div>
+        <div class="trow"><div class="flex1"><div class="pr-name">Shoulder Press</div><div style="color: var(--muted); font-size: 10px; margin-top: 2px;">Apr 20</div></div>
+          <div style="width: 100px; text-align: right; color: var(--text); font-weight: 800; font-size: 12px;">82.5<span class="unit"> kg</span><span class="unit"> × </span>6</div></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
