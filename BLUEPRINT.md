@@ -435,9 +435,18 @@ verified to match spec.
 
 ## 15. Distribution / App Store status
 
-**Current state (as of 2026-04-20 10:44 local): version 1.0 build 8 submitted to
-App Review — status "Waiting for Review".** Submission ID
-`8e53c25f-9699-4825-8c70-e25221482331`.
+**Current state (as of 2026-05-24): version 1.0 is approved and LIVE on the App
+Store. Version 1.0.1 (build 11) is in flight** — EAS production build
+`b452ef9f-12e1-4a0b-b388-ca2a83e7c1e2` queued 2026-05-24, auto-submitting to App
+Store Connect on completion. Next manual step: in ASC create the 1.0.1 version,
+add "What's New", attach build 11, submit for review (manual release).
+
+1.0.1 ships: Settings tab (CSV workout-log export + .db backup), editable
+prescription in the template editor, and the "NOT TODAY" skip button + amber
+skipped state.
+
+History: version 1.0 build 8 was submitted to App Review 2026-04-20 (submission
+ID `8e53c25f-9699-4825-8c70-e25221482331`) and subsequently approved + released.
 
 ### Accounts & identifiers
 - Apple Developer Team: `APVDU2G428` (K S Marcu, Individual)
@@ -466,9 +475,10 @@ App Review — status "Waiting for Review".** Submission ID
 npx eas-cli@latest build --platform ios --profile production   # ~20 min
 npx eas-cli@latest submit --platform ios --latest              # ~10 min to process
 ```
-Build number auto-increments server-side (`appVersionSource: remote`). After
-submit, open App Store Connect → Version 1.0 → swap the attached build to the
-new number, Save, then **Add for Review**.
+Build number auto-increments server-side (`appVersionSource: remote`). For an
+update, bump `version` in `app.json` first (e.g. 1.0.0 → 1.0.1). After submit,
+open App Store Connect → "+ Version or Platform" → create the new version number
+→ add "What's New" → attach the freshly-processed build → **Add for Review**.
 
 ### Known-gotchas checklist for future submissions
 - `.npmrc` must contain `legacy-peer-deps=true` — otherwise EAS's `npm ci` rejects `@expo/metro-runtime`'s `react-dom` peer dep and the build fails in *Install dependencies*
