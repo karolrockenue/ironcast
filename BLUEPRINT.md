@@ -439,12 +439,11 @@ verified to match spec.
 - **1.01 (build 9)** — LIVE on the App Store (released 2026-05-01, confirmed via
   `itunes.apple.com/lookup?id=6762591817`). Ships the pre-this-session sprint:
   rest-timer slim bar, PR top-toast, reps pre-fill from last session.
-- **1.02 (build 13)** — IN FLIGHT. EAS production build queued 2026-05-24,
-  auto-submitting to App Store Connect on completion. Ships this session's work:
-  Settings tab (CSV workout-log export + .db backup), editable prescription in
-  the template editor, "NOT TODAY" skip button + amber skipped state. Next manual
-  step: in ASC create the **1.02** version, add "What's New", attach build 13,
-  submit for review (manual release).
+- **1.02 (build 13)** — SUBMITTED to App Review 2026-05-24, status "Waiting for
+  Review", manual release. Ships this session's work: Settings tab (CSV
+  workout-log export + .db backup), editable prescription in the template editor,
+  "NOT TODAY" skip button + amber skipped state. After approval it sits at
+  "Pending Developer Release" → click **Release This Version** to go live.
 
 **Version-numbering scheme (IMPORTANT):** the store uses a two-segment decimal
 scheme `1.0` → `1.01` → `1.02`, NOT semantic `1.0.x`. Apple compares versions as
