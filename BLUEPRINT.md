@@ -435,18 +435,27 @@ verified to match spec.
 
 ## 15. Distribution / App Store status
 
-**Current state (as of 2026-05-24): version 1.0 is approved and LIVE on the App
-Store. Version 1.0.1 (build 11) is in flight** — EAS production build
-`b452ef9f-12e1-4a0b-b388-ca2a83e7c1e2` queued 2026-05-24, auto-submitting to App
-Store Connect on completion. Next manual step: in ASC create the 1.0.1 version,
-add "What's New", attach build 11, submit for review (manual release).
+**Current state (as of 2026-05-24):**
+- **1.0 (build 8)** — live on the App Store.
+- **1.0.1 (build 9)** — approved, "Ready for Distribution," released 2026-05-24.
+  Ships the pre-this-session sprint: rest-timer slim bar, PR top-toast, reps
+  pre-fill from last session.
+- **1.0.2 (build 12)** — IN FLIGHT. EAS production build queued 2026-05-24,
+  auto-submitting to App Store Connect on completion. Ships this session's work:
+  Settings tab (CSV workout-log export + .db backup), editable prescription in
+  the template editor, "NOT TODAY" skip button + amber skipped state. Next manual
+  step: in ASC create the 1.0.2 version, add "What's New", attach build 12,
+  submit for review (manual release).
 
-1.0.1 ships: Settings tab (CSV workout-log export + .db backup), editable
-prescription in the template editor, and the "NOT TODAY" skip button + amber
-skipped state.
+**Gotcha learned (don't repeat):** build 11 (version 1.0.1) was built + submitted
+this session but the submit failed with a generic "Something went wrong" — because
+1.0.1 was *already approved with build 9*, so Apple rejects a second 1.0.1 binary.
+A build's version string must match its target ASC version, and you can't add a
+new build to an already-approved/locked version. Bump `app.json` version for any
+new work (→ 1.0.2) and build fresh. Build 11 is a dead end.
 
-History: version 1.0 build 8 was submitted to App Review 2026-04-20 (submission
-ID `8e53c25f-9699-4825-8c70-e25221482331`) and subsequently approved + released.
+History: version 1.0 build 8 submitted to App Review 2026-04-20 (submission ID
+`8e53c25f-9699-4825-8c70-e25221482331`), approved + released.
 
 ### Accounts & identifiers
 - Apple Developer Team: `APVDU2G428` (K S Marcu, Individual)
