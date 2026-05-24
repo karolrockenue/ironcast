@@ -173,6 +173,35 @@ export async function updateTemplateName(
   ]);
 }
 
+// Update an exercise's prescription (sets / rep range / rest). This lives on
+// the shared `exercises` row, so the change applies to every template that
+// uses the exercise — and the rep range also feeds the progression engine
+// (rep_max = the target it pushes toward). Deadlift set count is overridden at
+// runtime by heavy/technique mode, so callers should not edit its default_sets.
+export async function updateExercisePrescription(
+  db: SQLite.SQLiteDatabase,
+  exerciseId: number,
+  p: {
+    default_sets: number;
+    default_rep_min: number;
+    default_rep_max: number;
+    default_rest_seconds: number;
+  }
+) {
+  await db.runAsync(
+    `UPDATE exercises
+        SET default_sets = ?, default_rep_min = ?, default_rep_max = ?, default_rest_seconds = ?
+      WHERE id = ?`,
+    [
+      p.default_sets,
+      p.default_rep_min,
+      p.default_rep_max,
+      p.default_rest_seconds,
+      exerciseId,
+    ]
+  );
+}
+
 export async function addExerciseToTemplate(
   db: SQLite.SQLiteDatabase,
   templateId: number,
@@ -276,6 +305,40 @@ export async function deleteSet(db: SQLite.SQLiteDatabase, setId: number) {
   await db.runAsync("DELETE FROM sets WHERE id = ?", [setId]);
 }
 
+export async function updateSet(
+  db: SQLite.SQLiteDatabase,
+  setId: number,
+  reps: number,
+  weight: number
+) {
+  await db.runAsync(
+    "UPDATE sets SET reps = ?, weight = ? WHERE id = ?",
+    [reps, weight, setId]
+  );
+}
+
+// After a set is deleted, renumber the remaining sets for that exercise in
+// that workout so set_number stays 1…N contiguous (keeps Set 1 = top set,
+// Set 2 = back-off invariants intact for progression).
+export async function renumberSetsForExercise(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number,
+  exerciseId: number
+) {
+  const rows = await db.getAllAsync<{ id: number }>(
+    `SELECT id FROM sets
+     WHERE workout_id = ? AND exercise_id = ?
+     ORDER BY completed_at, id`,
+    [workoutId, exerciseId]
+  );
+  for (let i = 0; i < rows.length; i++) {
+    await db.runAsync(
+      "UPDATE sets SET set_number = ? WHERE id = ?",
+      [i + 1, rows[i].id]
+    );
+  }
+}
+
 export async function getSetsForWorkout(
   db: SQLite.SQLiteDatabase,
   workoutId: number
@@ -318,6 +381,48 @@ export async function getWorkoutHistory(db: SQLite.SQLiteDatabase) {
      WHERE w.finished_at IS NOT NULL
      GROUP BY w.id
      ORDER BY w.started_at DESC`
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// CSV export — full set-level history for offline / LLM analysis
+// ───────────────────────────────────────────────────────────
+
+export type ExportRow = {
+  date: string;
+  started_at: string;
+  finished_at: string | null;
+  template_name: string | null;
+  deadlift_mode: string | null;
+  exercise_name: string;
+  muscle_group: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+};
+
+// Every logged set across all *finished* workouts, oldest first. One row per
+// set — the natural grain for a spreadsheet or for handing to Claude.
+export async function getAllSetsForExport(
+  db: SQLite.SQLiteDatabase
+): Promise<ExportRow[]> {
+  return db.getAllAsync<ExportRow>(
+    `SELECT date(w.started_at) as date,
+            w.started_at as started_at,
+            w.finished_at as finished_at,
+            t.name as template_name,
+            w.deadlift_mode as deadlift_mode,
+            e.name as exercise_name,
+            e.muscle_group as muscle_group,
+            s.set_number as set_number,
+            s.weight as weight,
+            s.reps as reps
+     FROM sets s
+     JOIN workouts w ON w.id = s.workout_id
+     JOIN exercises e ON e.id = s.exercise_id
+     LEFT JOIN templates t ON t.id = w.template_id
+     WHERE w.finished_at IS NOT NULL
+     ORDER BY w.started_at ASC, s.exercise_id ASC, s.set_number ASC`
   );
 }
 
@@ -986,4 +1091,102 @@ export async function getExerciseProgress(
      ORDER BY date(w.started_at)`,
     [exerciseId]
   );
+}
+
+// ───────────────────────────────────────────────────────────
+// Workout-level exercise skip state
+// ───────────────────────────────────────────────────────────
+
+export async function skipExercise(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number,
+  exerciseId: number
+) {
+  await db.runAsync(
+    `INSERT OR IGNORE INTO workout_skipped_exercises (workout_id, exercise_id)
+     VALUES (?, ?)`,
+    [workoutId, exerciseId]
+  );
+}
+
+export async function unskipExercise(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number,
+  exerciseId: number
+) {
+  await db.runAsync(
+    `DELETE FROM workout_skipped_exercises WHERE workout_id = ? AND exercise_id = ?`,
+    [workoutId, exerciseId]
+  );
+}
+
+export async function getSkippedForWorkout(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number
+): Promise<Set<number>> {
+  const rows = await db.getAllAsync<{ exercise_id: number }>(
+    `SELECT exercise_id FROM workout_skipped_exercises WHERE workout_id = ?`,
+    [workoutId]
+  );
+  return new Set(rows.map((r) => r.exercise_id));
+}
+
+export async function bulkSkipExercises(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number,
+  exerciseIds: number[]
+) {
+  for (const id of exerciseIds) {
+    await skipExercise(db, workoutId, id);
+  }
+}
+
+// ───────────────────────────────────────────────────────────
+// User settings (single-row key/value store in user_settings)
+// ───────────────────────────────────────────────────────────
+
+export type SettingKey =
+  | "rest_sound_enabled"
+  | "vibration_enabled"
+  | "health_write_enabled";
+
+export async function getSetting(
+  db: SQLite.SQLiteDatabase,
+  key: SettingKey
+): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM user_settings WHERE key = ?",
+    [key]
+  );
+  return row?.value ?? null;
+}
+
+export async function setSetting(
+  db: SQLite.SQLiteDatabase,
+  key: SettingKey,
+  value: string
+) {
+  await db.runAsync(
+    `INSERT INTO user_settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value]
+  );
+}
+
+export async function getBoolSetting(
+  db: SQLite.SQLiteDatabase,
+  key: SettingKey,
+  defaultValue: boolean
+): Promise<boolean> {
+  const v = await getSetting(db, key);
+  if (v === null) return defaultValue;
+  return v === "1";
+}
+
+export async function setBoolSetting(
+  db: SQLite.SQLiteDatabase,
+  key: SettingKey,
+  value: boolean
+) {
+  await setSetting(db, key, value ? "1" : "0");
 }

@@ -58,6 +58,21 @@ function ProgressIcon({ color, focused }: IconProps) {
   );
 }
 
+function SettingsIcon({ color, focused }: IconProps) {
+  const w = focused ? 2.4 : 1.9;
+  // Three horizontal sliders with offset knobs — "control" glyph.
+  return (
+    <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 6 H21" stroke={color} strokeWidth={w} strokeLinecap="round" />
+      <Path d="M3 12 H21" stroke={color} strokeWidth={w} strokeLinecap="round" />
+      <Path d="M3 18 H21" stroke={color} strokeWidth={w} strokeLinecap="round" />
+      <Circle cx="9" cy="6" r="2.2" fill={colors.bg} stroke={color} strokeWidth={w} />
+      <Circle cx="16" cy="12" r="2.2" fill={colors.bg} stroke={color} strokeWidth={w} />
+      <Circle cx="8" cy="18" r="2.2" fill={colors.bg} stroke={color} strokeWidth={w} />
+    </Svg>
+  );
+}
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -108,6 +123,16 @@ export default function TabLayout() {
           tabBarLabel: "PROGRESS",
           tabBarIcon: ({ color, focused }) => (
             <ProgressIcon color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarLabel: "SETTINGS",
+          tabBarIcon: ({ color, focused }) => (
+            <SettingsIcon color={color} focused={focused} />
           ),
         }}
       />

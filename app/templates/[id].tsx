@@ -7,6 +7,7 @@ import {
   Alert,
   StyleSheet,
   TextInput,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useDB } from "../../src/db/provider";
@@ -16,6 +17,7 @@ import {
   removeExerciseFromTemplate,
   moveTemplateExercise,
   updateTemplateName,
+  updateExercisePrescription,
   PrescribedExercise,
 } from "../../src/db/queries";
 import { workoutStore } from "../../src/store/workout";
@@ -35,6 +37,14 @@ export default function TemplateEditor() {
   const [exercises, setExercises] = useState<PrescribedExercise[]>([]);
   const [name, setName] = useState("");
   const [editingName, setEditingName] = useState(false);
+
+  // Prescription edit modal (sets / rep range / rest). Edits the shared
+  // exercise row, so they apply everywhere the exercise is used.
+  const [editing, setEditing] = useState<PrescribedExercise | null>(null);
+  const [eSets, setESets] = useState(2);
+  const [eRepMin, setERepMin] = useState(5);
+  const [eRepMax, setERepMax] = useState(8);
+  const [eRest, setERest] = useState(120);
 
   const reload = useCallback(async () => {
     const rows = await getPrescribedExercises(db, templateId);
@@ -101,6 +111,30 @@ export default function TemplateEditor() {
     setEditingName(false);
   };
 
+  const openEdit = (pe: PrescribedExercise) => {
+    setEditing(pe);
+    setESets(pe.default_sets);
+    setERepMin(pe.default_rep_min);
+    setERepMax(pe.default_rep_max);
+    setERest(pe.default_rest_seconds);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    const repMin = Math.max(1, eRepMin);
+    const repMax = Math.max(repMin, eRepMax);
+    await updateExercisePrescription(db, editing.exercise_id, {
+      default_sets: Math.max(1, eSets),
+      default_rep_min: repMin,
+      default_rep_max: repMax,
+      default_rest_seconds: Math.max(0, eRest),
+    });
+    setEditing(null);
+    await reload();
+  };
+
+  const isDeadlift = editing?.special_rules === "deadlift_ht";
+
   return (
     <View style={styles.container}>
       <View style={styles.nameRow}>
@@ -143,11 +177,18 @@ export default function TemplateEditor() {
                 <Text style={styles.indexNum}>{index + 1}.</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exerciseName}>{item.exercise_name}</Text>
-                  <Text style={styles.prescription}>
-                    {item.default_sets} set{item.default_sets !== 1 ? "s" : ""} ×{" "}
-                    {item.default_rep_min}–{item.default_rep_max} reps
-                    {"   "}Rest: {fmtRest(item.default_rest_seconds)}
-                  </Text>
+                  <Pressable
+                    style={styles.prescriptionBtn}
+                    onPress={() => openEdit(item)}
+                  >
+                    <Text style={styles.prescription}>
+                      {item.default_sets} set
+                      {item.default_sets !== 1 ? "s" : ""} ×{" "}
+                      {item.default_rep_min}–{item.default_rep_max} reps
+                      {"   "}Rest: {fmtRest(item.default_rest_seconds)}
+                    </Text>
+                    <Text style={styles.editTag}>EDIT</Text>
+                  </Pressable>
                   {modeSuffix.length > 0 && (
                     <Text style={styles.modeHint}>{modeSuffix.join(" · ")}</Text>
                   )}
@@ -188,6 +229,116 @@ export default function TemplateEditor() {
           <Text style={styles.addBtnText}>+ Add Exercise</Text>
         </Pressable>
       </View>
+
+      <Modal
+        visible={!!editing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditing(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setEditing(null)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{editing?.exercise_name}</Text>
+            <Text style={styles.modalSub}>
+              Applies to every plan using this exercise
+            </Text>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>SETS</Text>
+              {isDeadlift ? (
+                <Text style={styles.fieldLocked}>
+                  Auto — heavy 1 · technique 2
+                </Text>
+              ) : (
+                <Stepper value={eSets} min={1} max={6} onChange={setESets} />
+              )}
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>REP RANGE</Text>
+              <View style={styles.repRow}>
+                <Stepper
+                  value={eRepMin}
+                  min={1}
+                  max={99}
+                  onChange={(v) => {
+                    setERepMin(v);
+                    if (v > eRepMax) setERepMax(v);
+                  }}
+                />
+                <Text style={styles.repDash}>–</Text>
+                <Stepper
+                  value={eRepMax}
+                  min={1}
+                  max={99}
+                  onChange={(v) => setERepMax(Math.max(v, eRepMin))}
+                />
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>REST</Text>
+              <Stepper
+                value={eRest}
+                step={15}
+                min={0}
+                max={600}
+                onChange={setERest}
+                format={fmtRest}
+              />
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalCancel]}
+                onPress={() => setEditing(null)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalSave]}
+                onPress={saveEdit}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function Stepper({
+  value,
+  onChange,
+  step = 1,
+  min = 0,
+  max = 999,
+  format,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+  format?: (v: number) => string;
+}) {
+  return (
+    <View style={styles.stepper}>
+      <Pressable
+        style={styles.stepBtn}
+        onPress={() => onChange(Math.max(min, value - step))}
+      >
+        <Text style={styles.stepBtnText}>{"−"}</Text>
+      </Pressable>
+      <Text style={styles.stepValue}>{format ? format(value) : value}</Text>
+      <Pressable
+        style={styles.stepBtn}
+        onPress={() => onChange(Math.min(max, value + step))}
+      >
+        <Text style={styles.stepBtnText}>+</Text>
+      </Pressable>
     </View>
   );
 }
@@ -228,11 +379,28 @@ const styles = StyleSheet.create({
     minWidth: 22,
   },
   exerciseName: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  prescriptionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+    alignSelf: "flex-start",
+  },
   prescription: {
     color: colors.textSecondary,
     fontSize: 12,
-    marginTop: 4,
     letterSpacing: 0.3,
+  },
+  editTag: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   modeHint: {
     color: colors.accent,
@@ -268,4 +436,77 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   addBtnText: { color: colors.text, fontWeight: "700", fontSize: 16 },
+
+  // ── Prescription edit modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+  },
+  modalTitle: { color: colors.text, fontSize: 18, fontWeight: "800" },
+  modalSub: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  fieldLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  fieldLocked: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  repDash: { color: colors.textSecondary, fontSize: 16, fontWeight: "700" },
+  stepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 8,
+  },
+  stepBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  stepBtnText: { color: colors.accent, fontSize: 20, fontWeight: "800" },
+  stepValue: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "700",
+    minWidth: 48,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+  },
+  modalActions: { flexDirection: "row", gap: 12, marginTop: 24 },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalCancel: { backgroundColor: colors.surfaceLight },
+  modalCancelText: { color: colors.text, fontWeight: "700", fontSize: 15 },
+  modalSave: { backgroundColor: colors.accent },
+  modalSaveText: { color: colors.text, fontWeight: "800", fontSize: 15 },
 });

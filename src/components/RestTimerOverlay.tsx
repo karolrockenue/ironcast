@@ -1,5 +1,4 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import Svg, { Circle } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { RestState } from "../store/restTimer";
 
@@ -9,155 +8,128 @@ function fmt(t: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-const SIZE = 260;
-const STROKE = 14;
-const R = (SIZE - STROKE) / 2;
-const CIRCUM = 2 * Math.PI * R;
-
 type Props = {
   rest: RestState;
   onAdjust: (delta: number) => void;
   onSkip: () => void;
 };
 
+// Compact rest-timer bar. Renders inline above the bottom action row when a
+// rest is running. Non-blocking — the user can still tap exercise cards while
+// the timer counts down. A thin progress fill across the top of the bar
+// communicates remaining time without a full-screen takeover.
 export function RestTimerOverlay({ rest, onAdjust, onSkip }: Props) {
   if (!rest.running || rest.remaining <= 0) return null;
 
-  const fraction = rest.totalSeconds > 0 ? rest.remaining / rest.totalSeconds : 0;
-  const dashOffset = CIRCUM * (1 - fraction);
+  const fraction =
+    rest.totalSeconds > 0 ? rest.remaining / rest.totalSeconds : 0;
 
   return (
-    <View style={styles.backdrop} pointerEvents="auto">
-      <Text style={styles.heading}>REST</Text>
-
-      <View style={styles.ringWrap}>
-        <Svg width={SIZE} height={SIZE}>
-          <Circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={R}
-            stroke={colors.surfaceLight}
-            strokeWidth={STROKE}
-            fill="none"
-          />
-          <Circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={R}
-            stroke={colors.accent}
-            strokeWidth={STROKE}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${CIRCUM} ${CIRCUM}`}
-            strokeDashoffset={dashOffset}
-            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
-          />
-        </Svg>
-        <View style={styles.ringCenter} pointerEvents="none">
-          <Text style={styles.timeText}>{fmt(rest.remaining)}</Text>
-          <Text style={styles.totalText}>of {fmt(rest.totalSeconds)}</Text>
+    <View style={s.bar}>
+      <View style={s.progressTrack} pointerEvents="none">
+        <View style={[s.progressFill, { width: `${fraction * 100}%` }]} />
+      </View>
+      <View style={s.row}>
+        <View style={s.left}>
+          <Text style={s.label}>REST</Text>
+          <Text style={s.time}>{fmt(rest.remaining)}</Text>
+        </View>
+        <View style={s.actions}>
+          <Pressable style={s.adjBtn} onPress={() => onAdjust(-30)} hitSlop={6}>
+            <Text style={s.adjText}>−30</Text>
+          </Pressable>
+          <Pressable style={s.adjBtn} onPress={() => onAdjust(30)} hitSlop={6}>
+            <Text style={s.adjText}>+30</Text>
+          </Pressable>
+          <Pressable style={s.skipBtn} onPress={onSkip} hitSlop={6}>
+            <Text style={s.skipText}>SKIP</Text>
+          </Pressable>
         </View>
       </View>
-
-      <View style={styles.adjustRow}>
-        <Pressable style={styles.adjustBtn} onPress={() => onAdjust(-30)}>
-          <Text style={styles.adjustText}>−30s</Text>
-        </Pressable>
-        <Pressable style={styles.adjustBtn} onPress={() => onAdjust(30)}>
-          <Text style={styles.adjustText}>+30s</Text>
-        </Pressable>
-      </View>
-
-      {rest.label && (
-        <View style={styles.nextBox}>
-          <Text style={styles.nextLabel}>UP NEXT</Text>
-          <Text style={styles.nextText}>{rest.label}</Text>
-        </View>
-      )}
-
-      <Pressable style={styles.skipBtn} onPress={onSkip}>
-        <Text style={styles.skipText}>Skip Rest</Text>
-      </Pressable>
+      {rest.label ? (
+        <Text style={s.next} numberOfLines={1}>
+          UP NEXT · {rest.label}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
+const s = StyleSheet.create({
+  bar: {
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  progressTrack: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(13,13,13,0.97)",
-    justifyContent: "center",
+    height: 2,
+    backgroundColor: "rgba(74,144,217,0.15)",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.accent,
+  },
+  row: {
+    flexDirection: "row",
     alignItems: "center",
-    padding: 24,
-    zIndex: 100,
+    justifyContent: "space-between",
   },
-  heading: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 3,
-    marginBottom: 16,
+  left: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
   },
-  ringWrap: {
-    width: SIZE,
-    height: SIZE,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  ringCenter: {
-    position: "absolute",
-    alignItems: "center",
-  },
-  timeText: {
-    color: colors.text,
-    fontSize: 72,
-    fontWeight: "900",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -2,
-  },
-  totalText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontVariant: ["tabular-nums"],
-    marginTop: 2,
-  },
-  adjustRow: { flexDirection: "row", gap: 16, marginTop: 28 },
-  adjustBtn: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 26,
-    paddingVertical: 14,
-    borderRadius: 12,
-    minWidth: 100,
-    alignItems: "center",
-  },
-  adjustText: { color: colors.text, fontSize: 16, fontWeight: "700" },
-  nextBox: { marginTop: 32, alignItems: "center", maxWidth: "100%" },
-  nextLabel: {
+  label: {
     color: colors.textSecondary,
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 2,
   },
-  nextText: {
+  time: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 6,
-    textAlign: "center",
+    fontSize: 26,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.5,
+  },
+  actions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  adjBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceLight,
+  },
+  adjText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   skipBtn: {
-    position: "absolute",
-    bottom: 36,
-    left: 24,
-    right: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: "rgba(74,144,217,0.18)",
+    marginLeft: 4,
   },
-  skipText: { color: colors.textSecondary, fontSize: 15, fontWeight: "700" },
+  skipText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  next: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+    marginTop: 6,
+  },
 });

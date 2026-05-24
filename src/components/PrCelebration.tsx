@@ -1,16 +1,11 @@
 import { useEffect, useRef } from "react";
-import { Animated, Easing, Platform, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 import { PRKind } from "../db/queries";
 
-const heavyFont = Platform.select({
-  ios: "Impact",
-  android: "sans-serif-condensed",
-  default: undefined,
-}) as string | undefined;
-
-// Mid-workout PR celebration — fades in for ~1.6 s then fades out. The parent
-// controls the mount/unmount via `visible`; this component handles the animation.
+// Mid-workout PR toast. Slides down from the top and fades out — non-blocking,
+// so the rest timer and the rest of the screen stay interactive. Parent owns
+// mount/unmount via `visible`.
 export function PrCelebration({
   visible,
   kind,
@@ -20,120 +15,102 @@ export function PrCelebration({
   visible: boolean;
   kind: PRKind;
   exerciseName: string;
-  value: string; // pre-formatted display value, e.g. "55 kg × 8"
+  value: string;
 }) {
+  const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     if (!visible) {
+      translateY.setValue(-80);
       opacity.setValue(0);
-      scale.setValue(0.9);
       return;
     }
     Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        friction: 7,
+        tension: 80,
+        useNativeDriver: true,
+      }),
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
         easing: Easing.out(Easing.cubic),
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        friction: 6,
-        tension: 140,
-        useNativeDriver: true,
       }),
     ]).start();
   }, [visible]);
 
   if (!visible) return null;
 
-  const kindLabel = kind === "weight"
-    ? "WEIGHT"
-    : kind === "rep"
-    ? "REPS"
-    : "VOLUME";
+  const kindLabel =
+    kind === "weight" ? "WEIGHT" : kind === "rep" ? "REPS" : "VOLUME";
 
   return (
     <Animated.View
-      style={[s.backdrop, { opacity }]}
+      style={[s.toast, { opacity, transform: [{ translateY }] }]}
       pointerEvents="none"
     >
-      <Animated.View style={[s.card, { transform: [{ scale }] }]}>
-        <View style={s.badge}>
-          <Text
-            style={[s.badgeText, heavyFont ? { fontFamily: heavyFont } : null]}
-          >
-            PR
-          </Text>
-        </View>
-        <View style={s.bar} />
-        <Text style={s.newLabel}>NEW {kindLabel} RECORD</Text>
-        <Text style={s.ex} numberOfLines={2}>{exerciseName}</Text>
-        <Text style={s.value}>{value}</Text>
-      </Animated.View>
+      <View style={s.badge}>
+        <Text style={s.badgeText}>PR</Text>
+      </View>
+      <View style={s.body}>
+        <Text style={s.kindText}>NEW {kindLabel} RECORD</Text>
+        <Text style={s.exText} numberOfLines={1}>
+          {exerciseName} · {value}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: {
+  toast: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(13,13,13,0.96)",
-    justifyContent: "center",
+    top: 8,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     zIndex: 200,
-  },
-  card: {
-    alignItems: "center",
-    paddingHorizontal: 32,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   badge: {
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: colors.accent,
-    paddingHorizontal: 28,
-    paddingVertical: 6,
-    marginBottom: 18,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   badgeText: {
     color: colors.accent,
-    fontSize: 96,
+    fontSize: 16,
     fontWeight: "900",
-    letterSpacing: 6,
-    lineHeight: 96,
-    includeFontPadding: false,
+    letterSpacing: 1.5,
   },
-  bar: {
-    width: 56,
-    height: 3,
-    backgroundColor: colors.accent,
-    marginBottom: 14,
-  },
-  newLabel: {
+  body: { flex: 1 },
+  kindText: {
     color: colors.textSecondary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 4,
-    marginBottom: 14,
+    letterSpacing: 2,
   },
-  ex: {
+  exText: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 10,
-    letterSpacing: 0.5,
-  },
-  value: {
-    color: colors.text,
-    fontSize: 36,
-    fontWeight: "900",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -1,
+    marginTop: 2,
   },
 });

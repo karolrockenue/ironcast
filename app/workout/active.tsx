@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -14,6 +15,12 @@ import { useDB } from "../../src/db/provider";
 import {
   addSet,
   deleteSet,
+  updateSet,
+  renumberSetsForExercise,
+  skipExercise,
+  unskipExercise,
+  getSkippedForWorkout,
+  bulkSkipExercises,
   finishWorkout,
   deleteWorkout,
   getSetsForWorkout,
@@ -297,6 +304,153 @@ const lb = StyleSheet.create({
   btnDelText: { color: colors.danger, fontSize: 20, fontWeight: "700" },
 });
 
+// ─── Set edit modal ───────────────────────────────────────
+// Long-press a logged set row → opens this. Edits the reps/weight stored on
+// the row; save writes straight to the DB. Editing Set 1 will retrigger the
+// ActiveCard's useEffect that recalculates Set 2+ back-off weights.
+function SetEditModal({
+  visible,
+  initial,
+  exerciseName,
+  setNumber,
+  increment,
+  onSave,
+  onCancel,
+}: {
+  visible: boolean;
+  initial: { weight: number; reps: number } | null;
+  exerciseName: string;
+  setNumber: number;
+  increment: number;
+  onSave: (weight: number, reps: number) => void;
+  onCancel: () => void;
+}) {
+  const [weight, setWeight] = useState<number | null>(initial?.weight ?? 0);
+  const [reps, setReps] = useState<number | null>(initial?.reps ?? 0);
+
+  useEffect(() => {
+    if (visible && initial) {
+      setWeight(initial.weight);
+      setReps(initial.reps);
+    }
+  }, [visible, initial]);
+
+  const canSave = weight != null && weight >= 0 && reps != null && reps > 0;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <Pressable style={em.backdrop} onPress={onCancel}>
+        <Pressable style={em.sheet} onPress={() => {}}>
+          <Text style={em.title}>Edit Set {setNumber}</Text>
+          <Text style={em.sub}>{exerciseName}</Text>
+          <View style={em.row}>
+            <Text style={em.label}>WEIGHT</Text>
+            <NumericStepper
+              value={weight}
+              step={increment || 1}
+              unit="kg"
+              style={{ width: 140 }}
+              onChange={(n) => setWeight(n ?? 0)}
+            />
+          </View>
+          <View style={em.row}>
+            <Text style={em.label}>REPS</Text>
+            <NumericStepper
+              value={reps}
+              step={1}
+              style={{ width: 140 }}
+              onChange={(n) => setReps(n ?? 0)}
+            />
+          </View>
+          <View style={em.actions}>
+            <Pressable style={em.btnCancel} onPress={onCancel}>
+              <Text style={em.btnCancelText}>CANCEL</Text>
+            </Pressable>
+            <Pressable
+              style={[em.btnSave, !canSave && { opacity: 0.35 }]}
+              disabled={!canSave}
+              onPress={() => {
+                if (canSave) onSave(weight!, reps!);
+              }}
+            >
+              <Text style={em.btnSaveText}>SAVE</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+const em = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  sub: { color: colors.textSecondary, fontSize: 13, marginTop: 2, marginBottom: 16 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  label: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  actions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  btnCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: colors.surfaceLight,
+  },
+  btnCancelText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  btnSave: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: colors.accent,
+  },
+  btnSaveText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+});
+
 // ─── Cards ────────────────────────────────────────────────
 function DoneCard({
   ex,
@@ -357,26 +511,62 @@ function DoneCard({
 
 function PendingCard({
   ex,
+  loggedCount,
   onActivate,
+  onSkip,
 }: {
   ex: PrescribedExercise;
+  loggedCount: number;
   onActivate: () => void;
+  onSkip: () => void;
 }) {
+  const partial = loggedCount > 0;
   return (
-    <Pressable style={[c.card, c.cardPending]} onPress={onActivate}>
+    <Pressable
+      style={[c.card, c.cardPending]}
+      onPress={onActivate}
+      onLongPress={onSkip}
+      delayLongPress={500}
+    >
       <View style={c.hdr}>
         <View style={{ flex: 1 }}>
           <Text style={c.name} numberOfLines={1}>
             {ex.exercise_name}
           </Text>
           <Text style={c.sub}>
-            {ex.default_sets} sets · target {ex.default_rep_min}–{ex.default_rep_max}
+            {partial
+              ? `${loggedCount}/${ex.default_sets} sets done · resume`
+              : `${ex.default_sets} sets · target ${ex.default_rep_min}–${ex.default_rep_max}`}
           </Text>
         </View>
         <View style={[c.pill, c.pillPending]}>
           <Text style={[c.pillText, c.pillPendingText]}>
             {ex.default_rep_min}–{ex.default_rep_max}
           </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function SkippedCard({
+  ex,
+  onUnskip,
+}: {
+  ex: PrescribedExercise;
+  onUnskip: () => void;
+}) {
+  return (
+    <Pressable style={[c.card, c.cardSkipped]} onPress={onUnskip}>
+      <View style={c.hdr}>
+        <View style={{ flex: 1 }}>
+          <Text style={[c.name, c.nameSkipped]} numberOfLines={1}>
+            {ex.exercise_name}
+          </Text>
+          <Text style={c.sub}>Not today · tap to bring back</Text>
+        </View>
+        <View style={[c.pill, c.pillSkipped]}>
+          <Text style={[c.pillText, c.pillSkippedText]}>NOT TODAY</Text>
         </View>
       </View>
     </Pressable>
@@ -392,6 +582,8 @@ function ActiveCard({
   techniqueWeight,
   onLogSet,
   onDeleteSet,
+  onEditSet,
+  onSkip,
 }: {
   ex: PrescribedExercise;
   logged: SetRow[];
@@ -401,6 +593,8 @@ function ActiveCard({
   techniqueWeight: number | null;
   onLogSet: (setIdx: number, weight: number, reps: number) => void;
   onDeleteSet: (setId: number) => void;
+  onEditSet: (row: SetRow) => void;
+  onSkip: () => void;
 }) {
   const isDeadlift = ex.special_rules === "deadlift_ht";
   const isTechniqueDeadlift = isDeadlift && deadliftMode === "technique";
@@ -434,10 +628,21 @@ function ActiveCard({
       return roundToIncrement(base * backOff, ex.min_increment_kg);
     })
   );
-  // Reps per pending set — user types or steps into these. Logged sets don't
-  // consult this state; their value comes from the DB row.
+  // Reps per pending set — pre-fill with last session's matching set's reps so
+  // tapping ± adjusts from a sensible baseline instead of jumping to 1. The
+  // user can clear or edit before logging.
   const [repsPerSet, setRepsPerSet] = useState<(number | null)[]>(() =>
-    Array.from({ length: ex.default_sets }, () => null)
+    Array.from({ length: ex.default_sets }, (_, i) => {
+      const row = logged.find((l) => l.set_number === i + 1);
+      if (row) return row.reps;
+      return lastSessionSets.get(i + 1)?.reps ?? null;
+    })
+  );
+  // Per-set "user has manually edited the kg" flag. When true, the back-off
+  // auto-recalc skips that index — so a user-typed 70 kg on Set 2 isn't
+  // overwritten when Set 1 is logged.
+  const [kgUserEdited, setKgUserEdited] = useState<boolean[]>(() =>
+    Array.from({ length: ex.default_sets }, () => false)
   );
 
   // Sync logged sets' weights into state when new sets arrive.
@@ -454,7 +659,8 @@ function ActiveCard({
 
   // Dynamic Set 2+ recalculation: once Set 1 is logged, every back-off set
   // updates to reflect the actual Set 1 weight. Skips sets that are themselves
-  // already logged (those are frozen to their DB value).
+  // already logged, AND sets the user has manually edited (their typed value
+  // wins over the auto-calc).
   useEffect(() => {
     const set1 = logged.find((l) => l.set_number === 1);
     if (!set1 || ex.default_sets < 2) return;
@@ -463,11 +669,12 @@ function ActiveCard({
       for (let i = 1; i < ex.default_sets; i++) {
         const alreadyLogged = logged.find((l) => l.set_number === i + 1);
         if (alreadyLogged) continue;
+        if (kgUserEdited[i]) continue;
         next[i] = roundToIncrement(set1.weight * backOff, ex.min_increment_kg);
       }
       return next;
     });
-  }, [logged, ex.default_sets, backOff, ex.min_increment_kg]);
+  }, [logged, ex.default_sets, backOff, ex.min_increment_kg, kgUserEdited]);
 
   const currentSetIdx = logged.length; // first pending set
   const allDone = logged.length >= ex.default_sets;
@@ -509,7 +716,11 @@ function ActiveCard({
         </View>
       )}
 
-      <View style={c.hdr}>
+      <Pressable
+        style={c.hdr}
+        onLongPress={onSkip}
+        delayLongPress={500}
+      >
         <View style={{ flex: 1 }}>
           <View style={c.nameRow}>
             <View style={c.activeDot} />
@@ -529,7 +740,7 @@ function ActiveCard({
             {ex.default_rep_min}–{ex.default_rep_max}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       {/* Coach line — only when nothing logged yet */}
       {logged.length === 0 && (
@@ -561,8 +772,10 @@ function ActiveCard({
             onLogSet(idx, kg, pendingReps);
           };
           return (
-            <View
+            <Pressable
               key={idx}
+              onLongPress={row ? () => onEditSet(row) : undefined}
+              delayLongPress={400}
               style={[
                 c.setBlock,
                 isCurrent && c.setBlockCurrent,
@@ -589,6 +802,12 @@ function ActiveCard({
                     setKgPerSet((prev) => {
                       const next = [...prev];
                       next[idx] = n ?? 0;
+                      return next;
+                    });
+                    setKgUserEdited((prev) => {
+                      if (prev[idx]) return prev;
+                      const next = [...prev];
+                      next[idx] = true;
                       return next;
                     });
                   }}
@@ -641,11 +860,17 @@ function ActiveCard({
                   <View style={{ width: 52 }} />
                 </View>
               )}
-            </View>
+            </Pressable>
           );
         })}
       </View>
 
+      {/* Skip-for-today. Visible but low-emphasis, sat below the set rows so it
+          isn't fat-fingered while logging — and it routes through a confirm
+          dialog (onSkip), so it takes a deliberate second tap to activate. */}
+      <Pressable style={c.notTodayBtn} onPress={onSkip} hitSlop={6}>
+        <Text style={c.notTodayText}>NOT TODAY</Text>
+      </Pressable>
     </View>
   );
 }
@@ -676,6 +901,8 @@ export default function ActiveWorkout() {
     exerciseName: string;
     value: string;
   } | null>(null);
+  const [editingSet, setEditingSet] = useState<SetRow | null>(null);
+  const [skipped, setSkipped] = useState<Set<number>>(new Set());
 
   // Load prescription + workout mode + last-session data
   useEffect(() => {
@@ -695,9 +922,6 @@ export default function ActiveWorkout() {
           ? { ...r, default_sets: 1 }
           : r
       );
-      setPrescribed(adjusted);
-      setDeadliftMode(mode);
-      setTechniqueWeight(tech);
       const byEx = new Map<number, LastSet>();
       const bySession = new Map<number, Map<number, LastSet>>();
       for (const p of rows) {
@@ -708,13 +932,23 @@ export default function ActiveWorkout() {
         if (ls) byEx.set(p.exercise_id, ls);
         if (session.size > 0) bySession.set(p.exercise_id, session);
       }
+      // Set everything in one render so ActiveCard's state initializer sees
+      // a populated lastSessionSets map (used to pre-fill reps).
       setLastSetByEx(byEx);
       setLastSessionByEx(bySession);
+      setDeadliftMode(mode);
+      setTechniqueWeight(tech);
+      setPrescribed(adjusted);
     })();
   }, [db, templateId, workoutId]);
 
   const reload = useCallback(async () => {
-    setSets(await getSetsForWorkout(db, workoutId));
+    const [rows, skip] = await Promise.all([
+      getSetsForWorkout(db, workoutId),
+      getSkippedForWorkout(db, workoutId),
+    ]);
+    setSets(rows);
+    setSkipped(skip);
   }, [db, workoutId]);
   useEffect(() => {
     reload();
@@ -726,8 +960,10 @@ export default function ActiveWorkout() {
     [sets]
   );
   const isIncomplete = useCallback(
-    (p: PrescribedExercise) => setsCount(p.exercise_id) < p.default_sets,
-    [setsCount]
+    (p: PrescribedExercise) =>
+      !skipped.has(p.exercise_id) &&
+      setsCount(p.exercise_id) < p.default_sets,
+    [setsCount, skipped]
   );
 
   const activeId = useMemo(() => {
@@ -785,40 +1021,119 @@ export default function ActiveWorkout() {
         value: `${weight} kg × ${reps}`,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Keep the celebration visible ~1.6 s, then start rest.
-      setTimeout(() => setCelebration(null), 1600);
-      setTimeout(() => {
-        rest.start({ seconds: ex.default_rest_seconds, label });
-      }, 1700);
+      // PR toast is non-blocking — start rest immediately, fade toast out.
+      setTimeout(() => setCelebration(null), 2200);
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await rest.start({ seconds: ex.default_rest_seconds, label });
     }
+    await rest.start({ seconds: ex.default_rest_seconds, label });
 
     // If this was the last set, clear any manual override so auto-advance picks up.
     if (willBeDone) setManualActiveId(null);
   };
 
   const handleDeleteSet = async (setId: number) => {
+    const row = sets.find((s) => s.id === setId);
     await deleteSet(db, setId);
+    if (row)
+      await renumberSetsForExercise(db, workoutId, row.exercise_id);
     await reload();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleFinish = () => {
-    Alert.alert("Finish Workout", "Save and finish?", [
+  const handleEditSet = (row: SetRow) => {
+    Haptics.selectionAsync();
+    setEditingSet(row);
+  };
+
+  const handleSkip = (ex: PrescribedExercise) => {
+    Haptics.selectionAsync();
+    Alert.alert("Not today?", `Skip ${ex.exercise_name} for this session?`, [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Finish",
+        text: "Skip it",
+        style: "destructive",
         onPress: async () => {
-          await finishWorkout(db, workoutId);
-          await rest.skip();
-          router.replace({
-            pathname: "/workout/summary",
-            params: { id: String(workoutId) },
-          });
+          await skipExercise(db, workoutId, ex.exercise_id);
+          if (manualActiveId === ex.exercise_id) setManualActiveId(null);
+          await reload();
         },
       },
     ]);
+  };
+
+  const handleUnskip = (ex: PrescribedExercise) => {
+    Haptics.selectionAsync();
+    Alert.alert("Bring back", `Mark ${ex.exercise_name} as pending again?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Bring back",
+        onPress: async () => {
+          await unskipExercise(db, workoutId, ex.exercise_id);
+          await reload();
+        },
+      },
+    ]);
+  };
+
+  const handleSaveEdit = async (weight: number, reps: number) => {
+    if (!editingSet) return;
+    await updateSet(db, editingSet.id, reps, weight);
+    setEditingSet(null);
+    await reload();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleFinish = () => {
+    const finishNow = async () => {
+      await finishWorkout(db, workoutId);
+      await rest.skip();
+      router.replace({
+        pathname: "/workout/summary",
+        params: { id: String(workoutId) },
+      });
+    };
+
+    const remaining = prescribed.filter(
+      (p) =>
+        !skipped.has(p.exercise_id) &&
+        setsCount(p.exercise_id) < p.default_sets
+    );
+
+    if (remaining.length === 0) {
+      Alert.alert("Finish Workout", "Save and finish?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Finish", onPress: finishNow },
+      ]);
+      return;
+    }
+
+    const names = remaining
+      .map((r) => `• ${r.exercise_name}`)
+      .slice(0, 6)
+      .join("\n");
+    const more =
+      remaining.length > 6 ? `\n…and ${remaining.length - 6} more` : "";
+
+    Alert.alert(
+      `${remaining.length} unfinished exercise${remaining.length === 1 ? "" : "s"}`,
+      `${names}${more}\n\nMark them as skipped and finish?`,
+      [
+        { text: "Keep Going", style: "cancel" },
+        {
+          text: "Skip & Finish",
+          style: "destructive",
+          onPress: async () => {
+            await bulkSkipExercises(
+              db,
+              workoutId,
+              remaining.map((r) => r.exercise_id)
+            );
+            await finishNow();
+          },
+        },
+      ]
+    );
   };
 
   const handleDiscard = () => {
@@ -856,7 +1171,16 @@ export default function ActiveWorkout() {
           const logged = sets
             .filter((x) => x.exercise_id === ex.exercise_id)
             .sort((a, b) => a.set_number - b.set_number);
-          const done = logged.length >= ex.default_sets;
+          const isSkipped = skipped.has(ex.exercise_id);
+          const done = !isSkipped && logged.length >= ex.default_sets;
+          if (isSkipped)
+            return (
+              <SkippedCard
+                key={ex.id}
+                ex={ex}
+                onUnskip={() => handleUnskip(ex)}
+              />
+            );
           if (done)
             return <DoneCard key={ex.id} ex={ex} logged={logged} />;
           if (ex.exercise_id === activeId)
@@ -873,17 +1197,27 @@ export default function ActiveWorkout() {
                 techniqueWeight={techniqueWeight}
                 onLogSet={(idx, w, r) => handleLogSet(ex, idx, w, r)}
                 onDeleteSet={handleDeleteSet}
+                onEditSet={handleEditSet}
+                onSkip={() => handleSkip(ex)}
               />
             );
           return (
             <PendingCard
               key={ex.id}
               ex={ex}
+              loggedCount={logged.length}
               onActivate={() => setManualActiveId(ex.exercise_id)}
+              onSkip={() => handleSkip(ex)}
             />
           );
         })}
       </ScrollView>
+
+      <RestTimerOverlay
+        rest={rest.state}
+        onAdjust={rest.adjust}
+        onSkip={rest.skip}
+      />
 
       <View style={m.bottom}>
         <Pressable style={m.discardBtn} onPress={handleDiscard}>
@@ -894,12 +1228,6 @@ export default function ActiveWorkout() {
         </Pressable>
       </View>
 
-      <RestTimerOverlay
-        rest={rest.state}
-        onAdjust={rest.adjust}
-        onSkip={rest.skip}
-      />
-
       {celebration && (
         <PrCelebration
           visible
@@ -908,6 +1236,23 @@ export default function ActiveWorkout() {
           value={celebration.value}
         />
       )}
+
+      <SetEditModal
+        visible={editingSet !== null}
+        initial={
+          editingSet
+            ? { weight: editingSet.weight, reps: editingSet.reps }
+            : null
+        }
+        exerciseName={editingSet?.exercise_name ?? ""}
+        setNumber={editingSet?.set_number ?? 0}
+        increment={
+          prescribed.find((p) => p.exercise_id === editingSet?.exercise_id)
+            ?.min_increment_kg ?? 1
+        }
+        onSave={handleSaveEdit}
+        onCancel={() => setEditingSet(null)}
+      />
     </View>
   );
 }
@@ -980,6 +1325,15 @@ const c = StyleSheet.create({
   cardPending: {
     opacity: 0.55,
   },
+  cardSkipped: {
+    opacity: 0.9,
+    backgroundColor: "rgba(255,167,38,0.08)",
+    borderColor: "rgba(255,167,38,0.4)",
+  },
+  nameSkipped: {
+    textDecorationLine: "line-through",
+    color: colors.warning,
+  },
 
   hdr: {
     flexDirection: "row",
@@ -1022,6 +1376,24 @@ const c = StyleSheet.create({
   pillDoneText: { color: colors.success },
   pillPending: { backgroundColor: colors.surfaceLight },
   pillPendingText: { color: colors.textSecondary },
+  pillSkipped: { backgroundColor: "rgba(255,167,38,0.18)" },
+  pillSkippedText: { color: colors.warning, letterSpacing: 1 },
+
+  notTodayBtn: {
+    marginTop: 12,
+    alignSelf: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,167,38,0.45)",
+  },
+  notTodayText: {
+    color: colors.warning,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
 
   deadBanner: {
     padding: 10,

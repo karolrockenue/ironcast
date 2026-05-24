@@ -1,13 +1,23 @@
-# IronLog — Project Blueprint
+# IronCast — Project Blueprint
 
-**Last updated:** 2026-04-19
+**Last updated:** 2026-04-20
 
-IronLog is a React Native / Expo app for guided strength training. It alternates
+IronCast (renamed from IronLog on 2026-04-20; `IronLog` was already on the App
+Store) is a React Native / Expo app for guided strength training. It alternates
 the user through a strict two-workout split (A/B), auto-suggests weights based
 on last performance, runs rest timers in the background, and logs every set.
 
 This file is the single source of truth for project state. Update it whenever
 scope, schema, or design decisions change.
+
+**Internal identifiers that kept the old name** (intentional — changing would
+lose the EAS project link, Apple credentials, or user workout data):
+- Expo project slug: `ironlog`
+- iOS bundle identifier: `com.karolmarcu.ironlog`
+- URL scheme: `ironlog://`
+- SQLite filename: `ironlog.db`
+- Local working directory: `/Users/karolmarcu/Documents/ironlog`
+- GitHub repo: `github.com/karolrockenue/ironcast` (repo name follows the new brand)
 
 ---
 
@@ -21,9 +31,11 @@ scope, schema, or design decisions change.
 | Background timer | `expo-notifications` (local, scheduled at end time)  |
 | Haptics          | `expo-haptics`                                       |
 | Charts           | `react-native-chart-kit` (unused after dashboard rebuild; left as dep) |
-| SVG              | `react-native-svg` for rest timer ring               |
+| SVG              | `react-native-svg` for rest timer ring, tab icons, PR badge |
 | TypeScript       | strict mode enabled                                  |
-| Icons / fonts    | System fonts only (Impact / sans-serif-condensed for splash) |
+| Icons / fonts    | System fonts only (Impact / sans-serif-condensed for splash, PR badge, progress hero) |
+| iOS support      | iPhone only. `ios.supportsTablet: false` (disabled so we don't owe iPad screenshots) |
+| Build / ship     | EAS Build + EAS Submit. `eas.json` uses `appVersionSource: remote`, production has `autoIncrement`. `.npmrc` has `legacy-peer-deps=true` (required — npm ci otherwise rejects @expo/metro-runtime's react-dom peer) |
 
 No cloud sync, no account system, no telemetry. All data lives on-device.
 
@@ -187,7 +199,29 @@ template_exercises
   id, template_id, exercise_id, sort_order
 ```
 
-`PRAGMA user_version` drives nuke-and-reseed migrations. Current version: **6**.
+`PRAGMA user_version` drives nuke-and-reseed migrations. Current version: **9**.
+
+```
+workout_skipped_exercises
+  workout_id INTEGER, exercise_id INTEGER, PRIMARY KEY(workout_id, exercise_id)
+```
+Per-workout explicit skip state. Exercise states in the active screen:
+`not_started | in_progress | completed | skipped`. Skipping is orthogonal to
+sets — it doesn't delete logged rows, it just marks the exercise as
+intentionally out. Helpers: `skipExercise`, `unskipExercise`,
+`getSkippedForWorkout`, `bulkSkipExercises`.
+
+```
+user_settings
+  key TEXT PRIMARY KEY, value TEXT NOT NULL
+```
+Simple key/value store for app preferences. Accessors live in `queries.ts`:
+`getSetting` / `setSetting` (string) and `getBoolSetting` / `setBoolSetting`
+(bool via "1"/"0"). Keys typed as `SettingKey`.
+
+The exercise library is split into two arrays in `schema.ts`:
+- `WORKOUT_A` / `WORKOUT_B` — the 11 exercises used by the seeded plans, with user-specific rep ranges.
+- `CATALOG` — ~130 additional exercises (chest / back / shoulders / arms / legs / core / forearms) so users can build their own templates from the exercise picker. Plans win on name collision so A/B rep ranges are preserved.
 
 ---
 
@@ -223,8 +257,8 @@ Derived state on first launch:
 
 ## 9. Design decisions that are locked
 
-- **Theme:** Brutalist Lime dropped in favor of the **existing dark + blue accent** palette (`colors.ts`). Splash uses the *Stacked Brutalist* layout (IRON / LOG two-toned) but in the app's blue, not lime.
-- **Splash:** renders as an *overlay* in `_layout.tsx`, not as a route. Auto-dismisses after 1.6 s, tap to skip. Works regardless of which route the app opens on.
+- **Theme:** Brutalist Lime dropped in favor of the **existing dark + blue accent** palette (`colors.ts`). Splash uses the *Stacked Brutalist* layout (IRON / CAST two-toned) in the app's blue.
+- **Splash:** renders as an *overlay* in `_layout.tsx`, not as a route. **Tap to dismiss — no auto-dismiss** (changed from 1.6 s auto on 2026-04-20; auto-dismiss felt rushed and hid the wordmark).
 - **Active workout layout:** V7 — column headers (`SET · WEIGHT · REPS`), strong current-set highlight (1 px accent border + tint), inline last-session values directly under each stepper column.
 - **No slider for rep input.** Too fiddly at phone scale. Numeric stepper (typed + ± buttons) with placeholder = last session's reps at that set number.
 - **Live tint on reps input:** green (in range), blue (at/above top), yellow (below range), **red (regression vs last session)**. Red wins.
@@ -232,6 +266,11 @@ Derived state on first launch:
 - **Home: V02 Journal feed.** Reverse-chronological entries — in-progress banner (if any) → today/next-up with Start → past sessions. Deadlift mode + weight shown inline on the next-up card.
 - **No per-arm tracking.** "Single Arm" exercises log as 2 sets normally; user handles both arms mentally.
 - **Footer actions removed** from active workout. Auto-advance handles the "next exercise" flow when the current card's sets are all logged.
+- **PR celebration:** No emoji. Renders a brutalist "PR" wordmark in an accent-bordered frame with an accent divider bar, `NEW WEIGHT/REPS/VOLUME RECORD` meta line, exercise name, value (`src/components/PrCelebration.tsx`). Matches splash aesthetic.
+- **Tab bar:** Custom SVG icons (dumbbell / clock-arrow / bar-chart) via `react-native-svg`; stroke thickens when focused. Tab labels all-caps 11px with letter-spacing; header titles stay sentence-case (`tabBarLabel` separate from `title`).
+- **Progress tab:** Accent-bordered hero panel with total-volume as the single big number (Impact face, accent). Below: 3-cell strip (Sessions · Time · This Week) with vertical dividers. `30d` count demoted to footnote. PRs + Current Weights rendered as real tables with column headers, hairline row dividers, tabular-nums, explicit units.
+- **Templates header:** Back-button labels explicit — `Back` on `templates/index`, `Templates` on `templates/[id]`. Prevents the default `tabs` fallback label from parent stack.
+- **App icon:** Chosen concept **"Plate Edge" variant B** — solid dark disc with a blue bar-hole on the accent background. Previous iterations (concentric rings, bullseye) rejected for looking like a target at small sizes. Geometry: `assets/icon.png` (1024×1024, no alpha) generated from the SVG in `mockups/app-icon.html`. Same image copied to `adaptive-icon.png` and `splash-icon.png`.
 
 ---
 
@@ -262,47 +301,90 @@ Derived state on first launch:
 - [x] Reps placeholder = last session's matching set's reps (not just "reps")
 - [x] Red tint on reps stepper when reps < last session's same-set reps
 
-### Dashboard (Progress tab)
-- [x] 2×2 stats grid: total sessions, total volume, time lifted, this week (+ 30d subcount)
-- [x] All-time PRs table (W / R / V per exercise)
-- [x] Current working weights list (most recent Set 1 per exercise, alphabetical)
-- [x] Empty state when no sessions logged
+### Dashboard (Progress tab) — redesigned 2026-04-20
+- [x] Accent-bordered hero panel — total volume as the hero number (Impact face)
+- [x] 3-cell strip under hero: Sessions · Time · This Week with vertical dividers
+- [x] `30d` count as footnote below the strip
+- [x] All-time PRs rendered as a proper table: columns `EXERCISE / WEIGHT / REPS / VOL`, hairline dividers, explicit units, `fmtVolume` for `t` suffix on large totals
+- [x] Current Weights as a proper table: columns `EXERCISE / LAST SET`
+- [x] Empty state — centered on screen (not dangling at bottom of empty scroll)
+
+### Template building
+- [x] Exercise picker sections grouped by muscle group, alphabetically sorted
+- [x] Muscle-group chip filter row (horizontal scroll, "All" + per-group counts) combined with text search
+- [x] ~140-exercise library covering chest, back (vertical / horizontal / hinge), shoulders, traps, biceps, triceps, quads, hamstrings, glutes, calves, core, forearms
+- [x] Edit prescription from the template editor — tap an exercise's `SETS × REPS · Rest` line → modal with steppers for sets, rep range (min/max), and rest (±15 s). Writes to the **shared `exercises` row** (`updateExercisePrescription`), so the change applies to every plan using that exercise and the rep range feeds the progression engine. No schema change. Deadlift's set count is locked (auto heavy 1 / technique 2); only its reps + rest are editable.
+
+### Set management (active session)
+- [x] Long-press a logged set row → edit modal with weight + reps steppers (editing Set 1 auto-recalcs Set 2 back-off via existing `useEffect`)
+- [x] Tap × on a logged row → single-tap delete; `renumberSetsForExercise` keeps `set_number` contiguous so Set 1 = top-set invariant holds for progression
+- [x] Not exposed in history view — editing a *past* session would shift "last session" lookups and is deferred
+
+### Exercise navigation & skip (active session)
+- [x] Tap any pending card to jump — `manualActiveId` state
+- [x] **"NOT TODAY" button** on the active card (e.g. skip deadlift on a light week) — low-emphasis amber button sat below the set rows so it isn't fat-fingered, routed through the same "Not today?" confirm dialog (deliberate two-tap). Long-press on a pending/active card still skips too.
+- [x] Skipped state is **amber/yellow** (`colors.warning`) — yellow-tinted card + border, struck-through name, "NOT TODAY" pill (was red/grey "SKIPPED")
+- [x] Tap on a skipped card → "Bring back" confirm → unskip
+- [x] `activeId` / `isIncomplete` exclude skipped exercises so auto-advance routes around them
+- [x] Partial pending cards show `N/M sets done · resume` instead of the target range
+- [x] Finish-anyway confirm — if any exercises are neither done nor skipped, Finish shows a list + "Skip & Finish" option that bulk-marks them skipped before saving
+
+### Settings & data
+- [x] Settings tab (gear icon, 4th tab) with Data / Legal / About sections
+- [x] Export workout log (CSV) — `getAllSetsForExport` → one row per logged set across all finished workouts (`date,workout,deadlift_mode,exercise,set,weight_kg,reps,volume_kg,muscle_group,session_duration_min`), written to cache as `ironcast-log-{ISO}.csv` and handed to `expo-sharing`. Readable format for spreadsheets / handing to an LLM for analysis (the `.db` backup below is binary and not analysable)
+- [x] Export backup — copies `ironlog.db` to cache as `ironcast-backup-{ISO}.db`, hands to `expo-sharing` for save to Files/iCloud
+- [x] Privacy policy link opens external URL
+- [ ] Apple Health write — requires dev build, deferred to 1.0.2
+- [ ] Rest sound / vibration toggles — need wiring into `restTimer.ts`, deferred
 
 ### Identity
-- [x] Splash screen: Stacked Brutalist IRON/LOG wordmark, accent bar, tagline, 1.6 s auto-dismiss
+- [x] Splash screen: Stacked Brutalist IRON/CAST wordmark, accent bar, tagline. **Tap to dismiss** (no auto-dismiss)
 - [x] Dark theme: #0D0D0D bg, #4A90D9 accent, #F5F5F5 text
-- [x] Tab bar: text-only (Workout / History / Progress), safe-area respected
+- [x] Tab bar: SVG icons (dumbbell / clock-arrow / bar-chart) + all-caps labels, focus-state stroke weight
+- [x] PR celebration: framed "PR" wordmark lockup (no emoji)
+- [x] App icon: Plate Edge variant B (solid disc + bar hole, dark on accent)
 
 ---
 
 ## 11. Outstanding / not yet built
 
-From Addendum 5, ordered by my recommended attack order. Nothing here is started.
+Reality-ordered. Tier 1 = real users will miss it; Tier 2 = feels like a real
+tool; Tier 3 = nice; Skip = don't build.
 
-### Must ship in v1
-- [ ] **Edit / delete logged sets** in active + history (with cascading recalc of downstream Set 2 weight; tiny "edited" indicator in history)
-- [ ] **Exercise navigation within session** — tap any pending card to jump; explicit Skip vs undone; exercise states `not_started | in_progress | completed | skipped`
-- [ ] **Finish-anyway confirm** — when finishing with undone exercises, list them + "Mark remaining as skipped" option
-- [ ] **Onboarding flow** (first launch) — welcome, dominant arm, rest sound, vibration, notifications, data review, "start first workout"
-- [ ] **UserSettings table** — dominant_arm, rest_timer_sound, vibration_enabled, background_notifications_enabled
+### Tier 1 — should land in 1.0.1 / 1.0.2
+- [ ] **Apple Health write** — `HKWorkout` (traditionalStrengthTraining) on session finish. Bridge that feeds Whoop / Strava / Oura / Fitbit / etc. automatically. Requires a **dev build** (`eas build --profile development --platform ios`); not Expo Go compatible. Target 1.0.2.
+- [ ] **Onboarding flow** (first launch) — welcome, rest sound, vibration, notifications prompt, data review, "start first workout". Only blocked on deciding if it's actually needed (current app is close-enough discoverable).
+- [ ] **Rest sound / vibration toggles** in Settings — need wiring into `restTimer.ts` (notification sound on/off, haptic on rest end). `user_settings` table already exists.
+- [ ] **Edit / delete logged sets in history view** — history is an inline accordion; same modal as active should work. Caveat: editing past sessions shifts "last session" progression lookups — spec the warning UX before building.
 
-### Should ship in v1
+### Tier 2 — makes it feel like a real tool
+- [ ] **Bodyweight log** — single number per date. New `body_weights(date, kg)` table. Enables pull-up/chin-up/dip "added weight" semantics + future strength-to-weight stats.
+- [ ] **Warm-up set flag** — real sessions include warm-ups before the working sets. Current "Set 1 = top set" rule assumes no warm-ups. Options: (a) toggle on a set row to exclude from PR/progression; (b) add "warm-up" state distinct from set 1.
+- [ ] **Swap exercise mid-session** — Hack Squat machine occupied → tap the card → "Swap for today" → picker → substitutes for this workout only (template unchanged).
+- [ ] **Per-session note** — one line saved to `workouts.notes` (column already exists). "Shoulder felt off." Surfaced in history detail.
 - [ ] **Session-level actions on home:**
   - "Mark last session as completed" (creates a ghost session, flips alternation, no set data)
   - "Do different workout" (override alternation for this session only)
 - [ ] **"N days ago" context** on home's next-up ("You completed A last — 3 days ago")
 - [ ] **Partial session resume cutoff:** if active session is >12 h old, prompt "Continue or finish?"
 
-### Can defer to v1.1
+### Tier 3 — nice, defer
+- [ ] Plate calculator on barbell-lift active cards (`60 kg = 20 bar + 15 + 5`)
+- [ ] 1RM estimate (Epley) on summary / PR badge
 - [ ] Trend charts in Progress tab (weight over time per exercise, volume over time, sessions/week bar)
 - [ ] PR trophy badges in history list
 - [ ] Streak tracking (consecutive weeks with ≥2 sessions) — explicitly skipped for now in favor of "this week / last 30d" counts
-- [ ] Session note field
 - [ ] Share a session (PR celebration specifically)
-- [ ] Google Fonts upgrade — currently splash uses Platform system fonts (Impact / sans-serif-condensed); could install `@expo-google-fonts/anton` for exact Anton glyph
+- [ ] Google Fonts upgrade — splash currently uses Platform system fonts (Impact / sans-serif-condensed); could install `@expo-google-fonts/anton` for exact Anton glyph
+
+### Skip (bells-and-whistles — not building)
+- Whoop / Garmin / Oura direct API integrations. Apple Health is the universal bus; these platforms import from Health.
+- Metric ↔ imperial toggle. Touches progression math; wait for actual US requests.
+- Streaks, Siri shortcuts, widgets, light mode, Apple Watch companion.
+- Supabase / cloud sync — blueprint §14 covers future plan; local-first + backup export is v1.
 
 ### Known issues / gotchas
-- Schema version **6** = nuke + reseed. Bump this when changing schema OR seeded history.
+- Schema version **9** = nuke + reseed. Bump this when changing schema OR seeded history.
 - Rest-timer local notification requires user permission grant; permission prompt appears on first workout.
 - "62.5 kg" rendering bug is fixed (was caused by `flex: 1` on the stepper wrap conflicting with `width: 108`). Use `flex: 0` or just omit flex to pass width through.
 - No per-arm DB tracking — single-arm exercises log as 2 sets; user does both arms mentally.
@@ -319,7 +401,10 @@ From Addendum 5, ordered by my recommended attack order. Nothing here is started
 | `active-styles.html` | 6 slight variations of V1 + V7 "combined" | Picked **V7** (column headers + strong current + inline last-session) |
 | `app.html` | V7 iteration | Kept as reference |
 | `home.html` | 5 home-screen variants | Picked **V02 Journal** |
-| `start.html` | 15 start/title screens | Picked **06 Stacked Brutalist** (IRON / LOG) |
+| `start.html` | 15 start/title screens | Picked **06 Stacked Brutalist** (IRON / CAST after rebrand) |
+| `app-icon.html` | 5 app-icon directions (Stacked Brutalist wordmark / IL Monogram / Dumbbell / A/B Split / Plate Edge) | Picked **05 Plate Edge**; final rendering uses "variant B" (solid disc + hole) not the concentric rings |
+| `logo.html` | 5 logo lockups (stacked / horizontal / plate+wordmark / stamp / IC monogram) | Stacked Brutalist is the primary lockup (splash) |
+| `appstore-screens.html` | 6 App Store screens at 1242×2688 (splash / home / active / rest / summary / progress) | Exported PNGs at `screenshots/*.png` via headless Chrome and used directly in App Store Connect. Render script: `render` shown in §16 |
 
 ---
 
@@ -348,14 +433,149 @@ verified to match spec.
 
 ---
 
-## 15. Next session — pick up here
+## 15. Distribution / App Store status
 
-1. **Edit / delete logged sets** is probably the most user-facing missing
-   feature. Tap a logged row → edit; swipe/long-press → delete. Editing Set 1
-   should re-trigger the Set 2 back-off recalc.
-2. **Exercise navigation** is the second highest. The V7 active layout already
-   shows pending cards; make them tappable to jump, add a "Skip" long-press,
-   and update `onFinish` to list undone exercises.
-3. After those two, revisit whether onboarding is actually needed or if the
-   app is usable without one (current state is very close — only thing
-   missing is a settings UI for rest sound / vibration preferences).
+**Current state (as of 2026-04-20 10:44 local): version 1.0 build 8 submitted to
+App Review — status "Waiting for Review".** Submission ID
+`8e53c25f-9699-4825-8c70-e25221482331`.
+
+### Accounts & identifiers
+- Apple Developer Team: `APVDU2G428` (K S Marcu, Individual)
+- Apple ID for submission: `karol.marcu@gmail.com`
+- App Store Connect App ID: `6762591817`
+- App Store Connect API Key: managed by EAS (`[Expo] EAS Submit 5oq_0ShOIl`, ID `X6B28L4R6T`)
+- EAS owner account: `rockenue-app` (logged in as `karol@rockenue.com`)
+- EAS project: `@rockenue-app/ironlog`, project ID `54d3806f-c390-4684-8cc2-10d368d6f8c4`
+- iOS bundle ID: `com.karolmarcu.ironlog` (do not change — Apple won't let you)
+- GitHub Pages landing + privacy policy: `https://karolrockenue.github.io/ironcast/` and `.../privacy.html` served from `docs/` folder on `main` branch
+
+### App Store listing (version 1.0)
+- Name: `IronCast`
+- Subtitle: `Low Volume, High Intensity`
+- Primary category: Health & Fitness
+- Age rating: 4+
+- Release mode: **Manually release this version** — after approval, sits at "Pending Developer Release" until the user clicks *Release This Version*
+- Screenshots: 6 uploaded (6.5" iPhone slot). Rendered from `mockups/appstore-screens.html` via headless Chrome; sources in `screenshots/`
+- iPad: not supported. If you want iPad, flip `ios.supportsTablet` back on and upload 13" iPad screenshots (2064×2752 or 2752×2064)
+- Sign-in required for review: No
+- Data Collection (App Privacy): `No, we do not collect data from this app` → "Data Not Collected" labels
+- Export Compliance: `ITSAppUsesNonExemptEncryption: false` in `app.json` → review questionnaire auto-skips
+
+### Submit commands (reference)
+```
+npx eas-cli@latest build --platform ios --profile production   # ~20 min
+npx eas-cli@latest submit --platform ios --latest              # ~10 min to process
+```
+Build number auto-increments server-side (`appVersionSource: remote`). After
+submit, open App Store Connect → Version 1.0 → swap the attached build to the
+new number, Save, then **Add for Review**.
+
+### Known-gotchas checklist for future submissions
+- `.npmrc` must contain `legacy-peer-deps=true` — otherwise EAS's `npm ci` rejects `@expo/metro-runtime`'s `react-dom` peer dep and the build fails in *Install dependencies*
+- Icon must be **1024×1024, no alpha** — generate with headless Chrome (see §16)
+- If adding new screens / updating the app shell, regenerate `screenshots/*.png` from `mockups/appstore-screens.html` before re-submitting (especially if UI copy diverges — reviewers flag mismatched screenshots)
+
+---
+
+## 16. Asset generation
+
+### App Store screenshots (1242×2688)
+
+`mockups/appstore-screens.html` renders 6 mock screens at exact pixel dimensions
+(inside a `.mock` div that is `1242 × 2688`; content is designed at `414 × 896`
+logical points then `transform: scale(3)`). To export PNGs, use headless Chrome:
+
+```bash
+python3 <<'PY'
+# Split mockups/appstore-screens.html into 6 single-screen files with shared
+# CSS, then let Chrome headless render each at 1242×2688.
+import re, pathlib
+src = pathlib.Path('mockups/appstore-screens.html').read_text()
+style = re.search(r'<style>([\s\S]*?)</style>', src).group(1)
+
+def extract(s):
+    out, pos = [], 0
+    while True:
+        m = re.search(r'<div class="mock" id="(screen-[a-z]+)">', s[pos:])
+        if not m: break
+        start, sid, i, depth = pos + m.start(), m.group(1), pos + m.end(), 1
+        while depth > 0 and i < len(s):
+            o, c = s.find('<div', i), s.find('</div>', i)
+            if c == -1: break
+            if o != -1 and o < c: depth += 1; i = o + 4
+            else: depth -= 1; i = c + 6
+        out.append((sid, s[start:i])); pos = i
+    return out
+
+tmpl = """<!doctype html><html><head><meta charset="utf-8"><style>
+{style}
+html,body{{margin:0!important;padding:0!important;background:#0D0D0D!important;width:1242px;height:2688px;overflow:hidden}}
+.mock{{box-shadow:none!important}}</style></head><body>{body}</body></html>"""
+
+out = pathlib.Path('/tmp/ironcast-shots'); out.mkdir(exist_ok=True)
+for sid, blk in extract(src):
+    (out / f'{sid}.html').write_text(tmpl.format(style=style, body=blk))
+PY
+
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+for s in splash home active rest summary progress; do
+  "$CHROME" --headless=new --disable-gpu --hide-scrollbars \
+    --force-device-scale-factor=1 --window-size=1242,2688 \
+    --virtual-time-budget=2000 \
+    --screenshot="screenshots/$s.png" \
+    "file:///tmp/ironcast-shots/screen-$s.html"
+done
+```
+
+Critical flags: `--force-device-scale-factor=1` stops Retina doubling (otherwise
+the PNG lands at 2484×5376 and App Store Connect rejects it). The div-depth
+balancer in the Python is required — a naive non-greedy regex for the mock
+block stops at the first nested `</div></div>` pair, which gives you an empty
+home screen.
+
+### App icon (1024×1024, no alpha)
+
+The Plate Edge variant B icon is a 1024×1024 PNG with no alpha channel. Source
+SVG:
+
+```svg
+<svg viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#4A90D9"/>
+  <circle cx="50" cy="50" r="40" fill="#0D0D0D"/>
+  <circle cx="50" cy="50" r="11" fill="#4A90D9"/>
+</svg>
+```
+
+Render with headless Chrome into `assets/icon.png` (and copy to
+`adaptive-icon.png` + `splash-icon.png`). Verify with
+`sips -g hasAlpha assets/icon.png` — must report `hasAlpha: no`.
+
+---
+
+## 17. Next session — pick up here
+
+Session navigation, skip state, edit/delete, finish-anyway confirm, Settings
+tab + backup export, and the 140-exercise catalog all landed in a single
+sprint on 2026-04-20. Apple Health is the next meaningful gap and is blocked
+only on doing a one-time dev build.
+
+Pick one (see §11 for full list):
+
+1. **Apple Health write.** Install `@kingstinct/react-native-healthkit`, add
+   its Expo config plugin + `NSHealthShareUsageDescription` / write usage
+   string in `app.json`, run `eas build --profile development --platform ios`
+   once (~15 min first time), install the dev build on the phone, then from
+   here it's ~50 lines: request write permission for `workoutType`, save an
+   `HKWorkout` on `finishWorkout`. Blocks on dev-build step so Expo Go devs
+   can't test it — ship in 1.0.2.
+2. **Per-session note + bodyweight.** Both tiny. `workouts.notes` column is
+   already there — add an input to the summary screen. Bodyweight needs a
+   new 2-column table. Together maybe 90 min.
+3. **Swap exercise mid-session.** Scoped to this workout only. Requires a
+   thin join table `workout_exercise_overrides(workout_id, original_exercise_id,
+   substituted_exercise_id)` so the rest of the app (progression, history)
+   can still see the swap for this session.
+4. **Warm-up flag.** Touches progression math — spec first.
+
+Onboarding is still probably unnecessary. Current app is close to usable-on-
+first-launch. Skip until a real user hits a wall.
