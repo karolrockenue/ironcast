@@ -3,7 +3,7 @@
     "name": "IronCast",
     "slug": "ironlog",
     "scheme": "ironlog",
-    "version": "1.0.2",
+    "version": "1.02",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

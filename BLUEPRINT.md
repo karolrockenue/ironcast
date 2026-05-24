@@ -436,26 +436,32 @@ verified to match spec.
 ## 15. Distribution / App Store status
 
 **Current state (as of 2026-05-24):**
-- **1.0 (build 8)** — live on the App Store.
-- **1.0.1 (build 9)** — approved, "Ready for Distribution," released 2026-05-24.
-  Ships the pre-this-session sprint: rest-timer slim bar, PR top-toast, reps
-  pre-fill from last session.
-- **1.0.2 (build 12)** — IN FLIGHT. EAS production build queued 2026-05-24,
+- **1.01 (build 9)** — LIVE on the App Store (released 2026-05-01, confirmed via
+  `itunes.apple.com/lookup?id=6762591817`). Ships the pre-this-session sprint:
+  rest-timer slim bar, PR top-toast, reps pre-fill from last session.
+- **1.02 (build 13)** — IN FLIGHT. EAS production build queued 2026-05-24,
   auto-submitting to App Store Connect on completion. Ships this session's work:
   Settings tab (CSV workout-log export + .db backup), editable prescription in
   the template editor, "NOT TODAY" skip button + amber skipped state. Next manual
-  step: in ASC create the 1.0.2 version, add "What's New", attach build 12,
+  step: in ASC create the **1.02** version, add "What's New", attach build 13,
   submit for review (manual release).
 
-**Gotcha learned (don't repeat):** build 11 (version 1.0.1) was built + submitted
-this session but the submit failed with a generic "Something went wrong" — because
-1.0.1 was *already approved with build 9*, so Apple rejects a second 1.0.1 binary.
-A build's version string must match its target ASC version, and you can't add a
-new build to an already-approved/locked version. Bump `app.json` version for any
-new work (→ 1.0.2) and build fresh. Build 11 is a dead end.
+**Version-numbering scheme (IMPORTANT):** the store uses a two-segment decimal
+scheme `1.0` → `1.01` → `1.02`, NOT semantic `1.0.x`. Apple compares versions as
+integers per dot-segment, so `1.01` = [1,1]. A "1.0.2" = [1,0,2] is **LOWER** than
+`1.01` and App Store Connect rejects it. **Always bump the last decimal: next after
+1.02 is 1.03.** Set `version` in `app.json` to the bare `1.0N` string.
+
+**Gotchas learned this session (don't repeat):**
+- **Build 11 (1.0.1)** — built + submitted, failed with generic "Something went
+  wrong" because 1.0.1 was already live with build 9 (can't add a binary to a
+  released/locked version). Dead end.
+- **Build 12 (1.0.2)** — built before the version-scheme issue was caught; "1.0.2"
+  is un-shippable (lower than live 1.01). Orphaned in TestFlight, do not use.
+- Build 13 (1.02) is the real one.
 
 History: version 1.0 build 8 submitted to App Review 2026-04-20 (submission ID
-`8e53c25f-9699-4825-8c70-e25221482331`), approved + released.
+`8e53c25f-9699-4825-8c70-e25221482331`), approved + released; superseded by 1.01.
 
 ### Accounts & identifiers
 - Apple Developer Team: `APVDU2G428` (K S Marcu, Individual)
