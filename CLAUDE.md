@@ -1,6 +1,6 @@
 # IronCast — Project Blueprint
 
-**Last updated:** 2026-04-20
+**Last updated:** 2026-06-08
 
 IronCast (renamed from IronLog on 2026-04-20; `IronLog` was already on the App
 Store) is a React Native / Expo app for guided strength training. It alternates
@@ -199,7 +199,26 @@ template_exercises
   id, template_id, exercise_id, sort_order
 ```
 
-`PRAGMA user_version` drives nuke-and-reseed migrations. Current version: **9**.
+`PRAGMA user_version` drives migrations. Current version: **10**.
+
+**Migrations are no longer always destructive (changed 2026-06-08).** v9 shipped
+to the App Store, so `initDB` now branches: a fresh install (`user_version 0`)
+or a legacy pre-launch dev version (`< 9`) still nuke-and-reseeds, but any
+install at **v9+** runs an **additive** `migrateForward()` that only adds tables
+(`CREATE TABLE IF NOT EXISTS`) and transforms rows in place — it never drops a
+table holding user data. Bumping `SCHEMA_VERSION` for a schema change now means
+adding an additive step to `migrateForward`, NOT relying on the reseed.
+
+```
+set_drops
+  id, set_id (→ sets.id), drop_seq (1..n), weight, reps
+```
+Drop-set burnout stages hung off a parent set row (v10). The parent `sets` row
+stays THE set and alone drives progression + PR detection; each `set_drops` row
+is one reduced-weight stage done with no rest. Volume rollups (summary hero,
+Progress total, CSV) add these; PR/progression deliberately ignore them. No FK
+cascade reliance — `deleteSet`/`deleteWorkout` clear drops explicitly. Helpers:
+`addDrop`, `deleteDrop`, `getDropsForWorkout`.
 
 ```
 workout_skipped_exercises
@@ -290,6 +309,7 @@ Derived state on first launch:
 
 ### Smart behaviour
 - [x] Strict A/B alternation from last *finished* session's template
+- [x] **Override alternation for today** — `⇄ Do Workout X instead` switch on the home next-up card swaps A↔B for the current session only. Per-visit (resets on tab focus), recomputes deadlift mode/weight for the displayed plan, shows a "normally Workout Y" note when overriding. No persistence — alternation self-corrects from the next *finished* session.
 - [x] Deadlift heavy/technique alternation (last heavy → next technique)
 - [x] Deadlift heavy = 1 set, technique = 2 sets
 - [x] Technique weight = 75 % of last heavy's top set, rounded to 2.5 kg (ties down)
@@ -364,7 +384,7 @@ tool; Tier 3 = nice; Skip = don't build.
 - [ ] **Per-session note** — one line saved to `workouts.notes` (column already exists). "Shoulder felt off." Surfaced in history detail.
 - [ ] **Session-level actions on home:**
   - "Mark last session as completed" (creates a ghost session, flips alternation, no set data)
-  - "Do different workout" (override alternation for this session only)
+  - [x] **DONE (1.03):** "Do different workout" — `⇄ Do Workout X instead` switch on the next-up card overrides A/B alternation for the current session only.
 - [ ] **"N days ago" context** on home's next-up ("You completed A last — 3 days ago")
 - [ ] **Partial session resume cutoff:** if active session is >12 h old, prompt "Continue or finish?"
 
@@ -435,21 +455,49 @@ verified to match spec.
 
 ## 15. Distribution / App Store status
 
-**Current state (as of 2026-05-24):**
-- **1.01 (build 9)** — LIVE on the App Store (released 2026-05-01, confirmed via
-  `itunes.apple.com/lookup?id=6762591817`). Ships the pre-this-session sprint:
-  rest-timer slim bar, PR top-toast, reps pre-fill from last session.
-- **1.02 (build 13)** — SUBMITTED to App Review 2026-05-24, status "Waiting for
-  Review", manual release. Ships this session's work: Settings tab (CSV
+**Current state (as of 2026-06-08):**
+- **1.04** — BUILT + SUBMITTED via EAS 2026-06-08. Ships **drop sets** + the
+  **Reverse Machine Fly (Rear Delt)** rename + the **first additive
+  (non-destructive) DB migration** (schema v10, `set_drops` table). It ALSO
+  carries the 1.03 `⇄ Do Workout X instead` override, because those changes were
+  still uncommitted in the working tree when 1.04 was built — so 1.04 bundles
+  and supersedes 1.03. Bumped to 1.04 (not a new 1.03 build) to avoid colliding
+  with the already-uploaded 1.03 build 14 in ASC. **Remaining manual ASC steps:**
+  create the 1.04 version → "What's New" → attach the processed build → **Add
+  for Review** (manual release).
+  - Drop sets: tap `⇊ DROP SET` under the last logged set of an exercise (works
+    on the active card and the done card) → chain reduced-weight burnout stages,
+    each auto-filled at 75% of the stage above. Rest is suppressed while a drop
+    is open and restarts when it's logged. Parent set still drives
+    progression/PRs; drops are volume-only. Rendered as a ladder in
+    history/summary + a `drop` count; CSV export gains a `drop` column.
+- **1.03 (build 14)** — superseded by 1.04 before reaching the store (its one
+  feature, the workout override, is folded into 1.04). BUILT + SUBMITTED via EAS
+  2026-05-28 (binary uploaded to ASC) but the manual ASC version record / Add
+  for Review steps were never completed. Do not finish 1.03 separately — ship
+  1.04 instead.
+- **1.02 (build 13)** — RELEASED 2026-05-28. Was "Pending Developer Release";
+  Karol clicked **Release This Version**, so it's propagating to the store and
+  supersedes 1.01 (build 9). Ships the prior sprint: Settings tab (CSV
   workout-log export + .db backup), editable prescription in the template editor,
-  "NOT TODAY" skip button + amber skipped state. After approval it sits at
-  "Pending Developer Release" → click **Release This Version** to go live.
+  "NOT TODAY" skip button + amber skipped state.
+- **1.03 (build 14)** — BUILT + SUBMITTED via EAS 2026-05-28 (binary uploaded to
+  App Store Connect). Ships the **"pick today's workout"** override: a one-tap
+  `⇄ Do Workout X instead` switch on the home next-up card that overrides the A/B
+  alternation for the current session only. No schema change — the override is
+  in-memory and resets on tab focus, and alternation reads the last *finished*
+  workout so doing A again today self-corrects the next suggestion back to B.
+  **Remaining manual ASC steps:** create the 1.03 version (+ Version or Platform)
+  → add "What's New" → attach the processed build 14 → **Add for Review**
+  (manual release).
+- **1.01 (build 9)** — previous live version, superseded by 1.02.
 
 **Version-numbering scheme (IMPORTANT):** the store uses a two-segment decimal
 scheme `1.0` → `1.01` → `1.02`, NOT semantic `1.0.x`. Apple compares versions as
 integers per dot-segment, so `1.01` = [1,1]. A "1.0.2" = [1,0,2] is **LOWER** than
 `1.01` and App Store Connect rejects it. **Always bump the last decimal: next after
-1.02 is 1.03.** Set `version` in `app.json` to the bare `1.0N` string.
+1.02 is 1.03.** Set `version` in `app.json` to the bare `1.0N` string. (1.03 was
+skipped on the store — see above — so the live progression is `1.02` → `1.04`.)
 
 **Gotchas learned this session (don't repeat):**
 - **Build 11 (1.0.1)** — built + submitted, failed with generic "Something went
@@ -578,10 +626,16 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 
 ## 17. Next session — pick up here
 
-Session navigation, skip state, edit/delete, finish-anyway confirm, Settings
-tab + backup export, and the 140-exercise catalog all landed in a single
-sprint on 2026-04-20. Apple Health is the next meaningful gap and is blocked
-only on doing a one-time dev build.
+The 2026-06-08 session shipped **drop sets**, the **Reverse Machine Fly (Rear
+Delt)** rename, and the **first additive DB migration** (schema v10) as **1.04**
+— built + submitted via EAS. 1.04 also carries the prior 1.03 workout-override
+(it was uncommitted), so 1.03 is abandoned on the store. **ASC version record +
+"Add for Review" for 1.04 remain manual** (see §15). Apple Health is still the
+next meaningful gap and is blocked only on doing a one-time dev build.
+
+Verify on-device after the 1.04 update installs: real workout history is
+**preserved** (additive migration, not a reseed) and the rear-delt rename
+appears in the exercise library.
 
 Pick one (see §11 for full list):
 
@@ -591,7 +645,7 @@ Pick one (see §11 for full list):
    once (~15 min first time), install the dev build on the phone, then from
    here it's ~50 lines: request write permission for `workoutType`, save an
    `HKWorkout` on `finishWorkout`. Blocks on dev-build step so Expo Go devs
-   can't test it — ship in 1.0.2.
+   can't test it — ship in a future build.
 2. **Per-session note + bodyweight.** Both tiny. `workouts.notes` column is
    already there — add an input to the summary screen. Bodyweight needs a
    new 2-column table. Together maybe 90 min.

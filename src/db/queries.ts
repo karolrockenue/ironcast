@@ -44,6 +44,16 @@ export type SetRow = {
   completed_at: string;
 };
 
+// One reduced-weight burnout stage of a drop set, attached to a parent set
+// row (`set_id` → sets.id). drop_seq is 1..n in performed order.
+export type DropRow = {
+  id: number;
+  set_id: number;
+  drop_seq: number;
+  weight: number;
+  reps: number;
+};
+
 export type Template = {
   id: number;
   name: string;
@@ -282,6 +292,11 @@ export async function deleteWorkout(
   db: SQLite.SQLiteDatabase,
   workoutId: number
 ) {
+  await db.runAsync(
+    `DELETE FROM set_drops WHERE set_id IN
+       (SELECT id FROM sets WHERE workout_id = ?)`,
+    [workoutId]
+  );
   await db.runAsync("DELETE FROM sets WHERE workout_id = ?", [workoutId]);
   await db.runAsync("DELETE FROM workouts WHERE id = ?", [workoutId]);
 }
@@ -302,7 +317,48 @@ export async function addSet(
 }
 
 export async function deleteSet(db: SQLite.SQLiteDatabase, setId: number) {
+  // FK cascade isn't relied on (foreign_keys pragma isn't force-enabled), so
+  // drop the set's burnout stages explicitly.
+  await db.runAsync("DELETE FROM set_drops WHERE set_id = ?", [setId]);
   await db.runAsync("DELETE FROM sets WHERE id = ?", [setId]);
+}
+
+// ───────────────────────────────────────────────────────────
+// Drop sets — burnout stages attached to a parent set row
+// ───────────────────────────────────────────────────────────
+
+export async function addDrop(
+  db: SQLite.SQLiteDatabase,
+  setId: number,
+  dropSeq: number,
+  weight: number,
+  reps: number
+) {
+  const result = await db.runAsync(
+    "INSERT INTO set_drops (set_id, drop_seq, weight, reps) VALUES (?, ?, ?, ?)",
+    [setId, dropSeq, weight, reps]
+  );
+  return result.lastInsertRowId;
+}
+
+export async function deleteDrop(db: SQLite.SQLiteDatabase, dropId: number) {
+  await db.runAsync("DELETE FROM set_drops WHERE id = ?", [dropId]);
+}
+
+// All drop stages for a workout, oldest-first per set. Keyed in the UI by
+// set_id to render the ladder under each parent set.
+export async function getDropsForWorkout(
+  db: SQLite.SQLiteDatabase,
+  workoutId: number
+): Promise<DropRow[]> {
+  return db.getAllAsync<DropRow>(
+    `SELECT d.id, d.set_id, d.drop_seq, d.weight, d.reps
+     FROM set_drops d
+     JOIN sets s ON s.id = d.set_id
+     WHERE s.workout_id = ?
+     ORDER BY d.set_id, d.drop_seq`,
+    [workoutId]
+  );
 }
 
 export async function updateSet(
@@ -397,12 +453,14 @@ export type ExportRow = {
   exercise_name: string;
   muscle_group: string;
   set_number: number;
+  drop_seq: number; // 0 = top working set, 1..n = drop-set burnout stage
   weight: number;
   reps: number;
 };
 
-// Every logged set across all *finished* workouts, oldest first. One row per
-// set — the natural grain for a spreadsheet or for handing to Claude.
+// Every logged set + drop-set stage across all *finished* workouts, oldest
+// first. One row per set (drop_seq 0) plus one row per burnout stage — the
+// natural grain for a spreadsheet or for handing to Claude.
 export async function getAllSetsForExport(
   db: SQLite.SQLiteDatabase
 ): Promise<ExportRow[]> {
@@ -415,14 +473,35 @@ export async function getAllSetsForExport(
             e.name as exercise_name,
             e.muscle_group as muscle_group,
             s.set_number as set_number,
+            0 as drop_seq,
             s.weight as weight,
-            s.reps as reps
+            s.reps as reps,
+            s.exercise_id as exercise_id
      FROM sets s
      JOIN workouts w ON w.id = s.workout_id
      JOIN exercises e ON e.id = s.exercise_id
      LEFT JOIN templates t ON t.id = w.template_id
      WHERE w.finished_at IS NOT NULL
-     ORDER BY w.started_at ASC, s.exercise_id ASC, s.set_number ASC`
+     UNION ALL
+     SELECT date(w.started_at) as date,
+            w.started_at as started_at,
+            w.finished_at as finished_at,
+            t.name as template_name,
+            w.deadlift_mode as deadlift_mode,
+            e.name as exercise_name,
+            e.muscle_group as muscle_group,
+            s.set_number as set_number,
+            d.drop_seq as drop_seq,
+            d.weight as weight,
+            d.reps as reps,
+            s.exercise_id as exercise_id
+     FROM set_drops d
+     JOIN sets s ON s.id = d.set_id
+     JOIN workouts w ON w.id = s.workout_id
+     JOIN exercises e ON e.id = s.exercise_id
+     LEFT JOIN templates t ON t.id = w.template_id
+     WHERE w.finished_at IS NOT NULL
+     ORDER BY started_at ASC, exercise_id ASC, set_number ASC, drop_seq ASC`
   );
 }
 
@@ -705,6 +784,7 @@ export type WorkoutSummary = {
     sets: number;
     best_weight: number;
     best_reps: number;
+    drops: number; // count of drop-set burnout stages logged for this exercise
   }[];
   prs: PR[];
   deadlift_mode: "heavy" | "technique" | null;
@@ -735,9 +815,25 @@ export async function getWorkoutSummary(
     duration_min = Math.round(ms / 60000);
   }
 
-  const total_sets = sets.length;
-  const total_reps = sets.reduce((s, r) => s + r.reps, 0);
-  const total_volume = sets.reduce((s, r) => s + r.reps * r.weight, 0);
+  // Drop-set burnout stages count toward session totals (you did the reps),
+  // but NOT toward per-exercise PR comparison below — PRs track the top set.
+  const drops = await getDropsForWorkout(db, workoutId);
+  const dropReps = drops.reduce((s, d) => s + d.reps, 0);
+  const dropVolume = drops.reduce((s, d) => s + d.reps * d.weight, 0);
+
+  const total_sets = sets.length; // a drop set is still one set
+  const total_reps = sets.reduce((s, r) => s + r.reps, 0) + dropReps;
+  const total_volume =
+    sets.reduce((s, r) => s + r.reps * r.weight, 0) + dropVolume;
+
+  // Map each drop stage to its parent set's exercise so we can count drops
+  // per exercise for the summary badge.
+  const exIdBySetId = new Map<number, number>(sets.map((s) => [s.id, s.exercise_id]));
+  const dropCountByEx = new Map<number, number>();
+  for (const d of drops) {
+    const exId = exIdBySetId.get(d.set_id);
+    if (exId != null) dropCountByEx.set(exId, (dropCountByEx.get(exId) ?? 0) + 1);
+  }
 
   // Per-exercise breakdown
   const byEx = new Map<
@@ -833,11 +929,12 @@ export async function getWorkoutSummary(
     total_reps,
     total_volume,
     exercise_count: byEx.size,
-    exercises: [...byEx.values()].map((e) => ({
+    exercises: [...byEx.entries()].map(([exId, e]) => ({
       name: e.name,
       sets: e.sets,
       best_weight: e.best_weight,
       best_reps: e.best_reps,
+      drops: dropCountByEx.get(exId) ?? 0,
     })),
     prs,
     deadlift_mode: mode,
@@ -939,7 +1036,14 @@ export async function getStatsOverview(
      FROM workouts WHERE finished_at IS NOT NULL`
   );
   const vol = await db.getFirstAsync<{ v: number | null }>(
-    `SELECT SUM(s.weight * s.reps) as v
+    `SELECT
+       SUM(s.weight * s.reps)
+       + COALESCE((
+           SELECT SUM(d.weight * d.reps) FROM set_drops d
+           JOIN sets s2 ON s2.id = d.set_id
+           JOIN workouts w2 ON w2.id = s2.workout_id
+           WHERE w2.finished_at IS NOT NULL
+         ), 0) as v
      FROM sets s
      JOIN workouts w ON w.id = s.workout_id
      WHERE w.finished_at IS NOT NULL`

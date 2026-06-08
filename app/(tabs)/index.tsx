@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useDB } from "../../src/db/provider";
 import {
   startWorkout,
   getNextWorkoutPlan,
+  getAllTemplates,
   getNextDeadliftMode,
   getTechniqueDeadliftWeight,
   getLastHeavyDeadliftWeight,
@@ -54,7 +55,12 @@ function planLetterOf(name: string | null | undefined): string {
 export default function WorkoutTab() {
   const db = useDB();
   const router = useRouter();
-  const [nextPlan, setNextPlan] = useState<TemplateWithCount | null>(null);
+  // `autoPlan` is the strict-alternation suggestion; `chosenName` is a manual
+  // override for today only (reset on every focus). The displayed `nextPlan`
+  // is the override if set, else the alternation default.
+  const [autoPlan, setAutoPlan] = useState<TemplateWithCount | null>(null);
+  const [templates, setTemplates] = useState<TemplateWithCount[]>([]);
+  const [chosenName, setChosenName] = useState<string | null>(null);
   const [deadliftMode, setDeadliftMode] = useState<"heavy" | "technique" | null>(
     null
   );
@@ -69,36 +75,56 @@ export default function WorkoutTab() {
     useCallback(() => {
       let alive = true;
       (async () => {
-        const [next, un, hist] = await Promise.all([
+        const [next, all, un, hist] = await Promise.all([
           getNextWorkoutPlan(db),
+          getAllTemplates(db),
           getUnfinishedWorkout(db),
           getWorkoutHistory(db),
         ]);
         if (!alive) return;
-        setNextPlan(next ?? null);
+        setAutoPlan(next ?? null);
+        setTemplates(all);
         setUnfinished(un ?? null);
         setHistory(hist.slice(0, 5));
-        if (next?.name === "Workout B") {
-          const [mode, tech, heavy] = await Promise.all([
-            getNextDeadliftMode(db),
-            getTechniqueDeadliftWeight(db),
-            getLastHeavyDeadliftWeight(db),
-          ]);
-          if (!alive) return;
-          setDeadliftMode(mode);
-          setTechniqueWeight(tech);
-          setLastHeavyWeight(heavy);
-        } else {
-          setDeadliftMode(null);
-          setTechniqueWeight(null);
-          setLastHeavyWeight(null);
-        }
+        setChosenName(null);
       })();
       return () => {
         alive = false;
       };
     }, [db])
   );
+
+  // Displayed plan = manual override (if it resolves to a known template) else
+  // the alternation default.
+  const nextPlan = chosenName
+    ? templates.find((t) => t.name === chosenName) ?? autoPlan
+    : autoPlan;
+
+  // Deadlift mode/weight only matter for Workout B — refetch whenever the
+  // displayed plan changes (so switching A→B fills in the preview correctly).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (nextPlan?.name === "Workout B") {
+        const [mode, tech, heavy] = await Promise.all([
+          getNextDeadliftMode(db),
+          getTechniqueDeadliftWeight(db),
+          getLastHeavyDeadliftWeight(db),
+        ]);
+        if (!alive) return;
+        setDeadliftMode(mode);
+        setTechniqueWeight(tech);
+        setLastHeavyWeight(heavy);
+      } else {
+        setDeadliftMode(null);
+        setTechniqueWeight(null);
+        setLastHeavyWeight(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [db, nextPlan?.name]);
 
   const handleStart = async () => {
     if (!nextPlan) return;
@@ -127,6 +153,17 @@ export default function WorkoutTab() {
   };
 
   const planLetter = nextPlan ? planLetterOf(nextPlan.name) : "A";
+
+  // Override state: the displayed plan differs from the alternation default.
+  const isOverride =
+    !!autoPlan && !!nextPlan && nextPlan.name !== autoPlan.name;
+  // The other seeded A/B plan to offer as a one-tap switch.
+  const otherPlan =
+    templates.find(
+      (t) =>
+        (t.name === "Workout A" || t.name === "Workout B") &&
+        t.name !== nextPlan?.name
+    ) ?? null;
 
   // Deadlift descriptor for today's next-up (B only)
   let deadliftNote: string | null = null;
@@ -170,8 +207,10 @@ export default function WorkoutTab() {
 
       {/* Today / next up entry */}
       {nextPlan && !unfinished && (
-        <Pressable style={[styles.entry, styles.entryNext]} onPress={handleStart}>
-          <Text style={[styles.date, styles.dateNext]}>TODAY · NEXT UP</Text>
+        <View style={[styles.entry, styles.entryNext]}>
+          <Text style={[styles.date, styles.dateNext]}>
+            {isOverride ? "TODAY · YOUR PICK" : "TODAY · NEXT UP"}
+          </Text>
           <View style={styles.row1}>
             <Text style={styles.name}>{nextPlan.name}</Text>
             <Text style={styles.stats}>
@@ -179,13 +218,28 @@ export default function WorkoutTab() {
               {nextPlan.exercise_count !== 1 ? "s" : ""}
             </Text>
           </View>
+          {isOverride && autoPlan && (
+            <Text style={[styles.note, styles.noteOverride]}>
+              Overriding alternation · normally {autoPlan.name}
+            </Text>
+          )}
           {deadliftNote && (
             <Text style={[styles.note, styles.noteNext]}>{deadliftNote}</Text>
           )}
-          <View style={[styles.btn, styles.btnAccent]}>
+          <Pressable style={[styles.btn, styles.btnAccent]} onPress={handleStart}>
             <Text style={styles.btnText}>START WORKOUT {planLetter}</Text>
-          </View>
-        </Pressable>
+          </Pressable>
+          {otherPlan && (
+            <Pressable
+              style={styles.switchBtn}
+              onPress={() => setChosenName(otherPlan.name)}
+            >
+              <Text style={styles.switchText}>
+                {"⇄"}  Do {otherPlan.name} instead
+              </Text>
+            </Pressable>
+          )}
+        </View>
       )}
 
       {/* Past sessions — reverse chronological */}
@@ -291,6 +345,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   noteNext: { color: colors.accent, fontWeight: "700" },
+  noteOverride: { color: colors.warning, fontWeight: "700" },
 
   btn: {
     marginTop: 10,
@@ -304,6 +359,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+
+  switchBtn: {
+    marginTop: 8,
+    paddingVertical: 9,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  switchText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
 

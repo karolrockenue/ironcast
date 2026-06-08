@@ -27,7 +27,7 @@ function csvCell(v: string | number): string {
 // group + session duration are appended for richer analysis.
 function buildCsv(rows: ExportRow[]): string {
   const header =
-    "date,workout,deadlift_mode,exercise,set,weight_kg,reps,volume_kg,muscle_group,session_duration_min";
+    "date,workout,deadlift_mode,exercise,set,drop,weight_kg,reps,volume_kg,muscle_group,session_duration_min";
   const lines = rows.map((r) => {
     const workout =
       r.template_name === "Workout A"
@@ -51,6 +51,7 @@ function buildCsv(rows: ExportRow[]): string {
       r.deadlift_mode ?? "",
       csvCell(r.exercise_name),
       r.set_number,
+      r.drop_seq,
       r.weight,
       r.reps,
       volume,

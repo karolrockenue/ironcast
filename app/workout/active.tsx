@@ -30,7 +30,11 @@ import {
   getTechniqueDeadliftWeight,
   decideProgression,
   detectPRsForSet1,
+  addDrop,
+  deleteDrop,
+  getDropsForWorkout,
   SetRow,
+  DropRow,
   PrescribedExercise,
   LastSet,
   PRKind,
@@ -455,10 +459,19 @@ const em = StyleSheet.create({
 function DoneCard({
   ex,
   logged,
+  dropsBySet,
+  onAddDrop,
+  onDeleteDrop,
+  onBeginDrop,
 }: {
   ex: PrescribedExercise;
   logged: SetRow[];
+  dropsBySet: Map<number, DropRow[]>;
+  onAddDrop: (setId: number, dropSeq: number, weight: number, reps: number) => void;
+  onDeleteDrop: (dropId: number) => void;
+  onBeginDrop: () => void;
 }) {
+  const lastSet = logged[logged.length - 1] ?? null;
   const chips = logged.map((s) => {
     const state =
       s.reps >= ex.default_rep_max
@@ -505,6 +518,16 @@ function DoneCard({
         </View>
       </View>
       <View style={c.chips}>{chips}</View>
+      {lastSet && (
+        <DropLadder
+          setRow={lastSet}
+          drops={dropsBySet.get(lastSet.id) ?? []}
+          increment={ex.min_increment_kg}
+          onBegin={onBeginDrop}
+          onAdd={(seq, w, r) => onAddDrop(lastSet.id, seq, w, r)}
+          onDelete={onDeleteDrop}
+        />
+      )}
     </View>
   );
 }
@@ -573,6 +596,112 @@ function SkippedCard({
   );
 }
 
+// Drop-set ladder hung off a single (logged) set. Renders existing burnout
+// stages and a one-at-a-time inline editor for adding the next one. Each new
+// stage auto-fills at 75% of the stage above (rounded to the increment); reps
+// are typed. Opening the editor cancels any running rest (no rest between
+// drops); logging the stage restarts it — handled by the parent via onBegin /
+// onAdd.
+function DropLadder({
+  setRow,
+  drops,
+  increment,
+  onBegin,
+  onAdd,
+  onDelete,
+}: {
+  setRow: SetRow;
+  drops: DropRow[];
+  increment: number;
+  onBegin: () => void;
+  onAdd: (dropSeq: number, weight: number, reps: number) => void;
+  onDelete: (dropId: number) => void;
+}) {
+  const [pending, setPending] = useState<{ kg: number; reps: number | null } | null>(
+    null
+  );
+  const prev = drops.length
+    ? drops[drops.length - 1]
+    : { weight: setRow.weight, reps: setRow.reps };
+  const nextSeq = drops.length
+    ? Math.max(...drops.map((d) => d.drop_seq)) + 1
+    : 1;
+
+  const begin = () => {
+    onBegin();
+    setPending({ kg: roundToIncrement(prev.weight * 0.75, increment), reps: null });
+  };
+  const confirm = () => {
+    if (pending && pending.reps != null && pending.reps > 0) {
+      onAdd(nextSeq, pending.kg, pending.reps);
+      setPending(null);
+    }
+  };
+
+  return (
+    <View style={c.dropWrap}>
+      {drops.map((d) => (
+        <View key={d.id} style={c.dropRow}>
+          <Text style={c.dropTag}>↳</Text>
+          <View style={c.dropCellKg}>
+            <Text style={c.dropVal}>{d.weight} kg</Text>
+          </View>
+          <View style={c.dropCellReps}>
+            <Text style={c.dropVal}>{d.reps}</Text>
+          </View>
+          <Pressable style={c.dropDelBtn} onPress={() => onDelete(d.id)} hitSlop={8}>
+            <Text style={c.dropDelText}>{"×"}</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      {pending ? (
+        <>
+          <View style={c.dropRow}>
+            <Text style={c.dropTag}>↳</Text>
+            <NumericStepper
+              value={pending.kg}
+              step={increment}
+              unit="kg"
+              style={{ width: 96 }}
+              onChange={(n) =>
+                setPending((p) => (p ? { ...p, kg: n ?? 0 } : p))
+              }
+            />
+            <NumericStepper
+              value={pending.reps}
+              step={1}
+              allowEmpty
+              placeholder={String(prev.reps)}
+              style={{ flex: 1 }}
+              onChange={(n) => setPending((p) => (p ? { ...p, reps: n } : p))}
+            />
+            <LogButton
+              logged={false}
+              disabled={pending.reps == null || pending.reps <= 0}
+              onPress={confirm}
+            />
+            <Pressable
+              style={c.dropDelBtn}
+              onPress={() => setPending(null)}
+              hitSlop={8}
+            >
+              <Text style={c.dropDelText}>{"×"}</Text>
+            </Pressable>
+          </View>
+          <Text style={c.dropNoRest}>no rest — log this drop, then rest starts</Text>
+        </>
+      ) : (
+        <Pressable style={c.dropAdd} onPress={begin} hitSlop={6}>
+          <Text style={c.dropAddText}>
+            {"⇊"} {drops.length ? "ADD DROP" : "DROP SET"}
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 function ActiveCard({
   ex,
   logged,
@@ -580,9 +709,13 @@ function ActiveCard({
   lastSessionSets,
   deadliftMode,
   techniqueWeight,
+  dropsBySet,
   onLogSet,
   onDeleteSet,
   onEditSet,
+  onAddDrop,
+  onDeleteDrop,
+  onBeginDrop,
   onSkip,
 }: {
   ex: PrescribedExercise;
@@ -591,9 +724,13 @@ function ActiveCard({
   lastSessionSets: Map<number, LastSet>;
   deadliftMode: DeadliftMode;
   techniqueWeight: number | null;
+  dropsBySet: Map<number, DropRow[]>;
   onLogSet: (setIdx: number, weight: number, reps: number) => void;
   onDeleteSet: (setId: number) => void;
   onEditSet: (row: SetRow) => void;
+  onAddDrop: (setId: number, dropSeq: number, weight: number, reps: number) => void;
+  onDeleteDrop: (dropId: number) => void;
+  onBeginDrop: () => void;
   onSkip: () => void;
 }) {
   const isDeadlift = ex.special_rules === "deadlift_ht";
@@ -860,6 +997,17 @@ function ActiveCard({
                   <View style={{ width: 52 }} />
                 </View>
               )}
+              {/* Drop-set ladder hangs off the last logged set of the exercise. */}
+              {row && row.id === logged[logged.length - 1]?.id && (
+                <DropLadder
+                  setRow={row}
+                  drops={dropsBySet.get(row.id) ?? []}
+                  increment={ex.min_increment_kg}
+                  onBegin={onBeginDrop}
+                  onAdd={(seq, w, r) => onAddDrop(row.id, seq, w, r)}
+                  onDelete={onDeleteDrop}
+                />
+              )}
             </Pressable>
           );
         })}
@@ -903,6 +1051,7 @@ export default function ActiveWorkout() {
   } | null>(null);
   const [editingSet, setEditingSet] = useState<SetRow | null>(null);
   const [skipped, setSkipped] = useState<Set<number>>(new Set());
+  const [dropsBySet, setDropsBySet] = useState<Map<number, DropRow[]>>(new Map());
 
   // Load prescription + workout mode + last-session data
   useEffect(() => {
@@ -943,12 +1092,20 @@ export default function ActiveWorkout() {
   }, [db, templateId, workoutId]);
 
   const reload = useCallback(async () => {
-    const [rows, skip] = await Promise.all([
+    const [rows, skip, dropRows] = await Promise.all([
       getSetsForWorkout(db, workoutId),
       getSkippedForWorkout(db, workoutId),
+      getDropsForWorkout(db, workoutId),
     ]);
     setSets(rows);
     setSkipped(skip);
+    const bySet = new Map<number, DropRow[]>();
+    for (const d of dropRows) {
+      const arr = bySet.get(d.set_id);
+      if (arr) arr.push(d);
+      else bySet.set(d.set_id, [d]);
+    }
+    setDropsBySet(bySet);
   }, [db, workoutId]);
   useEffect(() => {
     reload();
@@ -1044,6 +1201,38 @@ export default function ActiveWorkout() {
   const handleEditSet = (row: SetRow) => {
     Haptics.selectionAsync();
     setEditingSet(row);
+  };
+
+  // ── Drop sets ──────────────────────────────────────────────
+  // Opening the drop editor cancels any running rest (no rest between drops).
+  const handleBeginDrop = async () => {
+    await rest.skip();
+  };
+
+  const handleAddDrop = async (
+    setId: number,
+    dropSeq: number,
+    weight: number,
+    reps: number
+  ) => {
+    const row = sets.find((s) => s.id === setId);
+    const ex = row
+      ? prescribed.find((p) => p.exercise_id === row.exercise_id)
+      : null;
+    await addDrop(db, setId, dropSeq, weight, reps);
+    await reload();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Rest restarts from the end of this drop — the burnout bout is over.
+    await rest.start({
+      seconds: ex?.default_rest_seconds ?? 90,
+      label: ex ? `${ex.exercise_name} · after drop set` : "Rest",
+    });
+  };
+
+  const handleDeleteDrop = async (dropId: number) => {
+    await deleteDrop(db, dropId);
+    await reload();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSkip = (ex: PrescribedExercise) => {
@@ -1182,7 +1371,17 @@ export default function ActiveWorkout() {
               />
             );
           if (done)
-            return <DoneCard key={ex.id} ex={ex} logged={logged} />;
+            return (
+              <DoneCard
+                key={ex.id}
+                ex={ex}
+                logged={logged}
+                dropsBySet={dropsBySet}
+                onAddDrop={handleAddDrop}
+                onDeleteDrop={handleDeleteDrop}
+                onBeginDrop={handleBeginDrop}
+              />
+            );
           if (ex.exercise_id === activeId)
             return (
               <ActiveCard
@@ -1195,9 +1394,13 @@ export default function ActiveWorkout() {
                 }
                 deadliftMode={deadliftMode}
                 techniqueWeight={techniqueWeight}
+                dropsBySet={dropsBySet}
                 onLogSet={(idx, w, r) => handleLogSet(ex, idx, w, r)}
                 onDeleteSet={handleDeleteSet}
                 onEditSet={handleEditSet}
+                onAddDrop={handleAddDrop}
+                onDeleteDrop={handleDeleteDrop}
+                onBeginDrop={handleBeginDrop}
                 onSkip={() => handleSkip(ex)}
               />
             );
@@ -1393,6 +1596,74 @@ const c = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
+  },
+
+  // ── Drop-set ladder ──
+  dropWrap: {
+    marginTop: 8,
+    marginLeft: 18,
+    paddingLeft: 12,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.accent,
+  },
+  dropRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 7,
+  },
+  dropTag: {
+    width: 14,
+    color: colors.accent,
+    fontSize: 14,
+    textAlign: "center",
+  },
+  dropCellKg: {
+    width: 96,
+    alignItems: "center",
+  },
+  dropCellReps: {
+    flex: 1,
+    alignItems: "center",
+  },
+  dropVal: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  dropDelBtn: {
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dropDelText: {
+    color: colors.textSecondary,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  dropAdd: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(74,144,217,0.5)",
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  dropAddText: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  dropNoRest: {
+    color: colors.warning,
+    fontSize: 10.5,
+    marginTop: 2,
+    marginBottom: 4,
   },
 
   deadBanner: {

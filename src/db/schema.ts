@@ -15,7 +15,12 @@ import * as SQLite from "expo-sqlite";
 // v9: workout_skipped_exercises table — per-workout explicit skip state so
 //     exercise states are not_started | in_progress | completed | skipped.
 //     Skipping is orthogonal to set data (doesn't delete existing sets).
-const SCHEMA_VERSION = 9;
+// v10: set_drops table (drop-set stages hung off a parent set row) + rename
+//     "Reverse Pec Deck" → "Reverse Machine Fly (Rear Delt)". FIRST schema
+//     change shipped AFTER the app went live, so the migration is ADDITIVE
+//     for live installs (v9+) — it preserves logged workouts instead of the
+//     historical nuke-and-reseed (see initDB).
+const SCHEMA_VERSION = 10;
 
 type ExerciseSeed = {
   name: string;
@@ -102,7 +107,7 @@ const CATALOG: ExerciseSeed[] = [
   { name: "Meadows Row",                        category: "pull", movement_type: "Compound",  muscle_group: "Back", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 120, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
   { name: "Inverted Row",                       category: "pull", movement_type: "Compound",  muscle_group: "Back", default_sets: 2, default_rep_min: 8,  default_rep_max: 15, default_rest_seconds: 90,  weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
   { name: "Face Pull (Cable)",                  category: "pull", movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 12, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Reverse Pec Deck",                   category: "pull", movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Reverse Machine Fly (Rear Delt)",    category: "pull", movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Bent-Over Rear Delt Fly (Dumbbell)", category: "pull", movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Cable Rear Delt Fly",                category: "pull", movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
 
@@ -249,24 +254,52 @@ export async function initDB(db: SQLite.SQLiteDatabase) {
     (await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version")) ??
     { user_version: 0 };
 
-  if (current < SCHEMA_VERSION) {
-    // Nuke: drop everything, rebuild, reseed.
-    await db.execAsync(`
-      DROP TABLE IF EXISTS sets;
-      DROP TABLE IF EXISTS workouts;
-      DROP TABLE IF EXISTS template_exercises;
-      DROP TABLE IF EXISTS templates;
-      DROP TABLE IF EXISTS exercises;
-      DROP TABLE IF EXISTS user_settings;
-      DROP TABLE IF EXISTS workout_skipped_exercises;
-    `);
+  if (current === SCHEMA_VERSION) {
+    // Same version — ensure tables exist (idempotent) for first-launch paths.
     await createSchema(db);
-    await seedExercisesAndPlans(db);
-    await seedHistory(db);
+    return;
+  }
+
+  if (current >= 9 && current < SCHEMA_VERSION) {
+    // LIVE-USER PATH. v9 is the version that shipped to the App Store, so any
+    // install at v9+ may hold real, irreplaceable workout history. Migrate
+    // forward in place — never drop user tables.
+    await createSchema(db); // CREATE TABLE IF NOT EXISTS adds new tables only
+    await migrateForward(db, current);
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-  } else {
-    // Same version — ensure tables exist (idempotent) for first-launch paths
-    await createSchema(db);
+    return;
+  }
+
+  // Fresh install (current === 0) or a legacy pre-launch dev version (< 9):
+  // safe to nuke and rebuild from seed.
+  await db.execAsync(`
+    DROP TABLE IF EXISTS set_drops;
+    DROP TABLE IF EXISTS sets;
+    DROP TABLE IF EXISTS workouts;
+    DROP TABLE IF EXISTS template_exercises;
+    DROP TABLE IF EXISTS templates;
+    DROP TABLE IF EXISTS exercises;
+    DROP TABLE IF EXISTS user_settings;
+    DROP TABLE IF EXISTS workout_skipped_exercises;
+  `);
+  await createSchema(db);
+  await seedExercisesAndPlans(db);
+  await seedHistory(db);
+  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+// Additive, non-destructive migrations for live installs. Each step only adds
+// tables (via createSchema's IF NOT EXISTS) or transforms existing rows in
+// place — it must never DROP a table that can hold user data.
+async function migrateForward(db: SQLite.SQLiteDatabase, from: number) {
+  if (from < 10) {
+    // v10: set_drops table is created by createSchema(). Rename the rear-delt
+    // machine fly so existing libraries pick up the clearer name. Rename is by
+    // name; templates/sets reference the row by id, so they are unaffected.
+    await db.runAsync(
+      "UPDATE exercises SET name = ? WHERE name = ?",
+      ["Reverse Machine Fly (Rear Delt)", "Reverse Pec Deck"]
+    );
   }
 }
 
@@ -338,6 +371,20 @@ async function createSchema(db: SQLite.SQLiteDatabase) {
       FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
       FOREIGN KEY (exercise_id) REFERENCES exercises(id)
     );
+
+    -- Drop-set stages hung off a parent set row. The parent row in sets
+    -- remains THE set (drives progression + PRs); each set_drops row is one
+    -- reduced-weight burnout stage performed with no rest, drop_seq 1..n.
+    -- Volume rollups add these; PR/progression logic deliberately ignores them.
+    CREATE TABLE IF NOT EXISTS set_drops (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      set_id INTEGER NOT NULL,
+      drop_seq INTEGER NOT NULL,
+      weight REAL NOT NULL,
+      reps INTEGER NOT NULL,
+      FOREIGN KEY (set_id) REFERENCES sets(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_set_drops_set ON set_drops(set_id);
   `);
 }
 

@@ -2,7 +2,13 @@ import { useCallback, useState } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useDB } from "../../src/db/provider";
-import { getWorkoutHistory, getSetsForWorkout, SetRow } from "../../src/db/queries";
+import {
+  getWorkoutHistory,
+  getSetsForWorkout,
+  getDropsForWorkout,
+  SetRow,
+  DropRow,
+} from "../../src/db/queries";
 import { colors } from "../../src/theme/colors";
 
 type WorkoutSummary = {
@@ -36,6 +42,9 @@ export default function HistoryTab() {
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [expandedSets, setExpandedSets] = useState<SetRow[]>([]);
+  const [expandedDrops, setExpandedDrops] = useState<Map<number, DropRow[]>>(
+    new Map()
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -47,10 +56,21 @@ export default function HistoryTab() {
     if (expanded === id) {
       setExpanded(null);
       setExpandedSets([]);
+      setExpandedDrops(new Map());
       return;
     }
-    const sets = await getSetsForWorkout(db, id);
+    const [sets, drops] = await Promise.all([
+      getSetsForWorkout(db, id),
+      getDropsForWorkout(db, id),
+    ]);
+    const bySet = new Map<number, DropRow[]>();
+    for (const d of drops) {
+      const arr = bySet.get(d.set_id);
+      if (arr) arr.push(d);
+      else bySet.set(d.set_id, [d]);
+    }
     setExpandedSets(sets);
+    setExpandedDrops(bySet);
     setExpanded(id);
   };
 
@@ -89,14 +109,32 @@ export default function HistoryTab() {
           </Pressable>
           {expanded === item.id && expandedSets.length > 0 && (
             <View style={styles.detail}>
-              {expandedSets.map((s) => (
-                <View key={s.id} style={styles.detailRow}>
-                  <Text style={styles.detailExercise}>{s.exercise_name}</Text>
-                  <Text style={styles.detailSet}>
-                    {s.weight} kg {"\u00D7"} {s.reps}
-                  </Text>
-                </View>
-              ))}
+              {expandedSets.map((s) => {
+                const drops = expandedDrops.get(s.id);
+                return (
+                  <View key={s.id}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailExercise}>
+                        {s.exercise_name}
+                        {drops && drops.length > 0 ? (
+                          <Text style={styles.dropBadge}> {"  "}DROP</Text>
+                        ) : null}
+                      </Text>
+                      <Text style={styles.detailSet}>
+                        {s.weight} kg {"\u00D7"} {s.reps}
+                      </Text>
+                    </View>
+                    {drops && drops.length > 0 && (
+                      <Text style={styles.dropLine}>
+                        {"\u21B3 "}
+                        {drops
+                          .map((d) => `${d.weight} kg \u00D7 ${d.reps}`)
+                          .join("   ")}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -136,6 +174,18 @@ const styles = StyleSheet.create({
   },
   detailExercise: { color: colors.text, fontSize: 14 },
   detailSet: { color: colors.textSecondary, fontSize: 14 },
+  dropBadge: {
+    color: colors.accent,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  dropLine: {
+    color: colors.accentLight,
+    fontSize: 12.5,
+    paddingBottom: 4,
+    fontVariant: ["tabular-nums"],
+  },
   empty: {
     flex: 1,
     backgroundColor: colors.bg,

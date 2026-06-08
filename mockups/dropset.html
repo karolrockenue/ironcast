@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>IronCast — Drop Set concepts</title>
+<style>
+  :root{
+    --bg:#0D0D0D; --surface:#1A1A1A; --surfaceLight:#252525; --border:#333;
+    --text:#F5F5F5; --textSec:#999; --accent:#4A90D9; --accentLight:#6AA8E8;
+    --danger:#E05555; --success:#4CAF50; --warning:#FFA726;
+    --cond:"Helvetica Neue Condensed","Arial Narrow",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#060606;color:var(--text);font-family:-apple-system,Helvetica,Arial,sans-serif;
+       padding:40px 24px 80px;display:flex;flex-wrap:wrap;gap:40px;justify-content:center;align-items:flex-start}
+  h1{width:100%;text-align:center;font-family:Impact,var(--cond);letter-spacing:1px;
+     font-size:34px;margin-bottom:4px}
+  h1 .b{color:var(--accent)}
+  .sub{width:100%;text-align:center;color:var(--textSec);margin-bottom:24px;font-size:14px}
+
+  /* phone frame */
+  .phone{width:390px;background:var(--bg);border:1px solid var(--border);border-radius:34px;
+         padding:18px 16px 24px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .caption{width:390px;text-align:center;color:var(--textSec);font-size:12.5px;margin-top:-26px;
+           text-transform:uppercase;letter-spacing:1.5px}
+  .caption b{color:var(--accent)}
+  .frameTitle{font-family:Impact,var(--cond);letter-spacing:.5px;font-size:13px;color:var(--textSec);
+              text-transform:uppercase;margin:2px 4px 14px}
+
+  /* exercise card */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 14px 12px}
+  .card.active{border-color:var(--accent)}
+  .exHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .exName{font-size:18px;font-weight:700}
+  .exTarget{color:var(--textSec);font-size:12px}
+  .rest{color:var(--accent);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+
+  /* column headers */
+  .cols{display:flex;align-items:center;gap:8px;padding:0 2px 6px;color:var(--textSec);
+        font-size:10px;letter-spacing:1.5px}
+  .cSet{width:44px}
+  .cKg{width:108px;text-align:center}
+  .cReps{flex:1;text-align:center}
+  .cBtn{width:52px}
+
+  /* set block */
+  .set{border-radius:12px;padding:8px 6px;margin-bottom:8px;background:transparent}
+  .set.cur{border:1px solid var(--accent);background:rgba(74,144,217,.08)}
+  .set.done{}
+  .row{display:flex;align-items:center;gap:8px}
+  .setN{width:44px;font-size:12px;letter-spacing:1px;color:var(--textSec)}
+  .set.cur .setN{color:#fff}
+  .set.done .setN{color:var(--success)}
+  .stepper{width:108px;display:flex;align-items:center;justify-content:space-between;
+           background:var(--surfaceLight);border:1px solid var(--border);border-radius:10px;
+           padding:8px 10px;font-variant-numeric:tabular-nums}
+  .stepper.reps{flex:1;width:auto}
+  .stepper .v{font-size:16px;font-weight:700}
+  .stepper .pm{color:var(--textSec);font-size:16px;width:14px;text-align:center}
+  .stepper.tintBlue{border-color:var(--accent);background:rgba(74,144,217,.12)}
+  .stepper.tintGreen{border-color:var(--success);background:rgba(76,175,80,.12)}
+  .logBtn{width:52px;height:38px;border-radius:10px;border:1px solid var(--border);
+          display:flex;align-items:center;justify-content:center;font-size:11px;
+          letter-spacing:1px;color:var(--textSec)}
+  .logBtn.ready{background:var(--accent);border-color:var(--accent);color:#fff}
+  .logBtn.done{background:transparent;border-color:var(--success);color:var(--success);font-size:16px}
+  .lastInline{display:flex;gap:8px;margin-top:6px;padding-left:46px;color:var(--textSec);font-size:11px}
+  .lastInline .lk{width:108px;text-align:center}
+  .lastInline .lr{flex:1;text-align:center}
+
+  /* drop affordance + ladder */
+  .dropToggle{display:inline-flex;align-items:center;gap:6px;margin:2px 0 0 46px;
+              color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+              border:1px dashed rgba(74,144,217,.5);border-radius:8px;padding:5px 9px}
+  .drop{margin:6px 0 0 22px;border-left:2px solid var(--accent);padding-left:12px}
+  .dropRow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .dropTag{width:22px;color:var(--accent);font-size:13px;text-align:center}
+  .dropStepper{display:flex;align-items:center;justify-content:space-between;
+               background:var(--surfaceLight);border:1px solid var(--border);border-radius:9px;
+               padding:6px 9px;font-variant-numeric:tabular-nums}
+  .dropStepper.kg{width:96px}
+  .dropStepper.reps{flex:1}
+  .dropStepper .v{font-size:14px;font-weight:700}
+  .dropStepper .pm{color:var(--textSec);font-size:14px;width:12px;text-align:center}
+  .dropDel{width:30px;text-align:center;color:var(--textSec);font-size:15px}
+  .addDrop{margin:2px 0 2px 36px;color:var(--accent);font-size:11px;letter-spacing:1.5px;
+           text-transform:uppercase;border:1px dashed rgba(74,144,217,.5);border-radius:8px;
+           padding:5px 10px;display:inline-block}
+  .noRest{margin:8px 0 2px 24px;color:var(--warning);font-size:10.5px;letter-spacing:.5px}
+  .noRest::before{content:"⛌  ";}
+
+  /* collapsed / logged drop set summary */
+  .dropDone{margin:6px 0 0 22px;border-left:2px solid var(--success);padding-left:12px;
+            color:var(--success);font-size:12px;letter-spacing:.3px}
+  .dropDone .seq{font-variant-numeric:tabular-nums;font-weight:700}
+  .dropDone .vol{color:var(--textSec);margin-left:6px}
+
+  /* history chip */
+  .histRow{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;
+           border-bottom:1px solid var(--border)}
+  .histName{font-size:14px}
+  .histChip{font-variant-numeric:tabular-nums;color:var(--text);font-size:13px}
+  .ds{display:inline-block;background:rgba(74,144,217,.15);border:1px solid var(--accent);
+      color:var(--accentLight);border-radius:6px;padding:1px 7px;font-size:10px;letter-spacing:1px;
+      margin-left:8px;vertical-align:middle}
+
+  .legend{width:100%;max-width:840px;margin-top:8px;background:var(--surface);
+          border:1px solid var(--border);border-radius:14px;padding:20px 24px;line-height:1.6;font-size:14px}
+  .legend h2{font-family:Impact,var(--cond);letter-spacing:.5px;font-size:18px;margin-bottom:10px}
+  .legend code{background:#000;border:1px solid var(--border);border-radius:5px;padding:1px 6px;
+               font-size:12.5px;color:var(--accentLight)}
+  .legend li{margin:5px 0 5px 18px}
+  .legend .k{color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+  <h1>IRON<span class="b">CAST</span> — DROP SETS</h1>
+  <div class="sub">Active-workout concept · V7 layout preserved · proposal for approval</div>
+
+  <!-- ===== SCREEN 1: convert a set into a drop set ===== -->
+  <div class="phone">
+    <div class="frameTitle">1 · A normal set offers a drop</div>
+    <div class="card active">
+      <div class="exHead">
+        <div>
+          <div class="exName">Lateral Raise (Machine)</div>
+          <div class="exTarget">2 × 10–15 · isolation</div>
+        </div>
+        <div class="rest">rest 1:00</div>
+      </div>
+
+      <div class="cols"><div class="cSet">SET</div><div class="cKg">WEIGHT</div><div class="cReps">REPS</div><div class="cBtn"></div></div>
+
+      <div class="set done">
+        <div class="row">
+          <div class="setN">SET 1</div>
+          <div class="stepper"><span class="pm">–</span><span class="v">15</span><span class="pm">+</span></div>
+          <div class="stepper reps"><span class="pm">–</span><span class="v">12</span><span class="pm">+</span></div>
+          <div class="logBtn done">✓</div>
+        </div>
+        <div class="lastInline"><div style="width:46px"></div><div class="lk">last · 15 kg</div><div class="lr">last · 11</div></div>
+      </div>
+
+      <div class="set cur">
+        <div class="row">
+          <div class="setN">SET 2</div>
+          <div class="stepper"><span class="pm">–</span><span class="v">12.5</span><span class="pm">+</span></div>
+          <div class="stepper reps tintGreen"><span class="pm">–</span><span class="v">13</span><span class="pm">+</span></div>
+          <div class="logBtn ready">LOG</div>
+        </div>
+        <!-- the new affordance: turn this set into a drop set -->
+        <div class="dropToggle">⇊ make this a drop set</div>
+      </div>
+    </div>
+    <div class="frameTitle" style="margin-top:14px">Tap <b style="color:var(--accent)">⇊</b> on any working set to chain drops onto it.</div>
+  </div>
+  <div class="caption">tap <b>⇊</b> → set 2 expands into a ladder</div>
+
+  <!-- ===== SCREEN 2: drop ladder mid-entry ===== -->
+  <div class="phone">
+    <div class="frameTitle">2 · Logging the drop ladder</div>
+    <div class="card active">
+      <div class="exHead">
+        <div>
+          <div class="exName">Lateral Raise (Machine)</div>
+          <div class="exTarget">2 × 10–15 · isolation</div>
+        </div>
+        <div class="rest">rest 1:00</div>
+      </div>
+
+      <div class="cols"><div class="cSet">SET</div><div class="cKg">WEIGHT</div><div class="cReps">REPS</div><div class="cBtn"></div></div>
+
+      <div class="set done">
+        <div class="row">
+          <div class="setN">SET 1</div>
+          <div class="stepper"><span class="pm">–</span><span class="v">15</span><span class="pm">+</span></div>
+          <div class="stepper reps"><span class="pm">–</span><span class="v">12</span><span class="pm">+</span></div>
+          <div class="logBtn done">✓</div>
+        </div>
+      </div>
+
+      <!-- SET 2, now a drop set: top stage + chained drops -->
+      <div class="set cur">
+        <div class="row">
+          <div class="setN">SET 2</div>
+          <div class="stepper"><span class="pm">–</span><span class="v">12.5</span><span class="pm">+</span></div>
+          <div class="stepper reps tintGreen"><span class="pm">–</span><span class="v">13</span><span class="pm">+</span></div>
+          <div class="logBtn ready">LOG</div>
+        </div>
+
+        <div class="drop">
+          <div class="dropRow">
+            <div class="dropTag">↳</div>
+            <div class="dropStepper kg"><span class="pm">–</span><span class="v">10</span><span class="pm">+</span></div>
+            <div class="dropStepper reps"><span class="pm">–</span><span class="v">11</span><span class="pm">+</span></div>
+            <div class="dropDel">×</div>
+          </div>
+          <div class="dropRow">
+            <div class="dropTag">↳</div>
+            <div class="dropStepper kg"><span class="pm">–</span><span class="v">7.5</span><span class="pm">+</span></div>
+            <div class="dropStepper reps"><span class="pm">–</span><span class="v">9</span><span class="pm">+</span></div>
+            <div class="dropDel">×</div>
+          </div>
+        </div>
+        <div class="addDrop">＋ add drop</div>
+        <div class="noRest">no rest timer between drops — it starts after the last drop is logged</div>
+      </div>
+    </div>
+    <div class="frameTitle" style="margin-top:14px">Each <b style="color:var(--accent)">↳</b> auto-fills at ~75% of the stage above; edit freely.</div>
+  </div>
+  <div class="caption">drops chain under the parent · <b>one LOG</b> closes the bout</div>
+
+  <!-- ===== SCREEN 3: logged + collapsed, plus history ===== -->
+  <div class="phone">
+    <div class="frameTitle">3 · Logged (collapsed) + history</div>
+    <div class="card">
+      <div class="exHead">
+        <div>
+          <div class="exName">Lateral Raise (Machine)</div>
+          <div class="exTarget">2 × 10–15 · isolation</div>
+        </div>
+        <div class="rest" style="color:var(--success)">done</div>
+      </div>
+
+      <div class="set done">
+        <div class="row">
+          <div class="setN">SET 1</div>
+          <div class="stepper"><span class="v" style="margin:0 auto">15 kg</span></div>
+          <div class="stepper reps"><span class="v" style="margin:0 auto">12</span></div>
+          <div class="logBtn done">✓</div>
+        </div>
+      </div>
+
+      <div class="set done">
+        <div class="row">
+          <div class="setN">SET 2</div>
+          <div class="stepper"><span class="v" style="margin:0 auto">12.5 kg</span></div>
+          <div class="stepper reps"><span class="v" style="margin:0 auto">13</span></div>
+          <div class="logBtn done">✓</div>
+        </div>
+        <div class="dropDone">
+          ↳ <span class="seq">12.5 → 10 → 7.5 kg</span> · 13 / 11 / 9 reps
+          <span class="vol">drop set · 416 kg vol</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="frameTitle" style="margin-top:18px">In History &amp; Summary</div>
+    <div class="card" style="padding:4px 14px">
+      <div class="histRow">
+        <div class="histName">Lateral Raise (Machine) <span class="ds">drop</span></div>
+        <div class="histChip">12.5→7.5 · 33 reps</div>
+      </div>
+      <div class="histRow" style="border-bottom:none">
+        <div class="histName">Seated Row (Machine)</div>
+        <div class="histChip">60 · 8</div>
+      </div>
+    </div>
+    <div class="frameTitle" style="margin-top:14px">Top stage still drives progression &amp; PRs. Drops are volume only.</div>
+  </div>
+  <div class="caption">a <b>drop</b> badge marks it · ladder shown inline</div>
+
+  <!-- ===== legend / spec ===== -->
+  <div class="legend">
+    <h2>How it works (the proposal)</h2>
+    <ul>
+      <li><span class="k">Any working set can become a drop set.</span> Tap <code>⇊</code> under the current set to chain reduced-weight drops onto it. Default new drop = previous stage × <code>0.75</code> rounded to the increment (same rounding the deadlift technique-day uses).</li>
+      <li><span class="k">It is still one set.</span> The parent row (the top stage) is the real <code>set_number</code> row — it alone feeds the progression engine and PR detection. <em>Nothing in <code>decideProgression()</code> / PR logic changes.</em> Drops are extra volume hung off it.</li>
+      <li><span class="k">No rest between drops.</span> The rest timer is suppressed while a drop ladder is open and only fires once the final drop is logged — matching how a drop set is actually performed.</li>
+      <li><span class="k">Volume is summed across all stages.</span> History, Summary, and the CSV export count parent + every drop. A <code>drop</code> badge + the <code>12.5 → 10 → 7.5</code> ladder render inline.</li>
+    </ul>
+    <h2 style="margin-top:16px">Data model — additive, non-destructive</h2>
+    <ul>
+      <li>New table <code>set_drops(id, set_id → sets.id, drop_seq, weight, reps)</code>. One row per drop stage below the parent.</li>
+      <li>Migration is <span class="k">additive</span> (<code>CREATE TABLE IF NOT EXISTS</code> + insert the new exercise if absent) — <em>not</em> the current nuke-and-reseed, so your real logged history on the phone survives.</li>
+      <li>CSV export gains a <code>drop_seq</code> column (0 = top stage, 1..n = drops) so an LLM/spreadsheet can read the full ladder.</li>
+    </ul>
+  </div>
+</body>
+</html>

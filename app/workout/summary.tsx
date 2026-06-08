@@ -202,6 +202,9 @@ export default function Summary() {
           <Text style={s.exDetail}>
             {ex.sets} set{ex.sets !== 1 ? "s" : ""} {"\u00B7"} best {ex.best_weight}
             kg {"\u00D7"} {ex.best_reps}
+            {ex.drops > 0
+              ? ` \u00B7 +${ex.drops} drop${ex.drops !== 1 ? "s" : ""}`
+              : ""}
           </Text>
         </View>
       ))}
