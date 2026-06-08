@@ -46,7 +46,7 @@ No cloud sync, no account system, no telemetry. All data lives on-device.
 - Two workout plans: **A** (push + quads) and **B** (pull + shoulders + biceps, plus deadlift).
 - **Strict alternation** based on the last *completed* session — not calendar based. A completed → B next. B completed → A next. Doesn't matter if you trained yesterday or three weeks ago.
 - **2 working sets** per exercise (the only exception: deadlift — see §4).
-- **Set 1 = top working set.** Set 2 = back-off drop set. The progression engine reads Set 1; Set 2 is informational.
+- **Set 1 = top working set.** Set 2 = back-off set (a *separate* set after full rest, weight = Set 1 × back-off ratio). The progression engine reads Set 1; Set 2 is informational. **NB — not to be confused with true drop sets** (added in 1.04, §10): those are within-set burnout stages done with *no rest*, stored in `set_drops` and hung off a single parent set. "Back-off Set 2" and "drop set" are different mechanisms.
 - **Automatic weight progression.** Hit top of rep range → increase by the exercise's equipment increment next time. In range (not at top) → same weight, push for more reps. Below range → drop one increment.
 - **Back-off ratio** on Set 2 is per-exercise (0.80 for Lat Pulldown, 0.90 standard, 1.00 for single-arm lateral raise and hanging leg raises).
 - **Deadlift alternates heavy ↔ technique** across successive B sessions (see §4).
@@ -340,6 +340,15 @@ Derived state on first launch:
 - [x] Tap × on a logged row → single-tap delete; `renumberSetsForExercise` keeps `set_number` contiguous so Set 1 = top-set invariant holds for progression
 - [x] Not exposed in history view — editing a *past* session would shift "last session" lookups and is deferred
 
+### Drop sets (1.04)
+- [x] **`⇊ DROP SET` affordance** under the last logged set of an exercise — appears on both the active card (`DropLadder` under the last logged set) and the done card. Tap it to start a burnout stage.
+- [x] **Auto-fill at 75%** — each new drop pre-fills weight = previous stage × 0.75 rounded to the exercise increment (`roundToIncrement`); reps are typed (placeholder = previous stage's reps). Add multiple via `＋ ADD DROP`.
+- [x] **No rest between drops** — opening the drop editor cancels any running rest (`onBeginDrop` → `rest.skip()`); logging the drop restarts it (`handleAddDrop` → `rest.start`). Matches how a drop set is performed.
+- [x] **Parent set still owns progression + PRs** — drops live in `set_drops`, hung off the parent `sets` row by `set_id`; `decideProgression` / PR detection read the parent only and are untouched. Drops are **volume-only**.
+- [x] **Volume rollups include drops** — summary hero `total_volume` + `total_reps`, Progress-tab total volume, and CSV export all add drop volume. Per-exercise volume used for the volume-PR comparison stays parent-only (consistent with the historical query, so drops never trigger a false PR).
+- [x] **Rendered after the fact** — History detail shows the `↳ 10 kg × 11   7.5 kg × 9` ladder + a `DROP` badge; Summary shows `· +N drops` on the exercise line. CSV export gains a `drop` column (0 = top set, 1..n = drop stage).
+- [x] Delete a logged drop with its `×`; `deleteSet`/`deleteWorkout` clear drops explicitly (no FK-cascade reliance). Mockup: `mockups/dropset.html`.
+
 ### Exercise navigation & skip (active session)
 - [x] Tap any pending card to jump — `manualActiveId` state
 - [x] **"NOT TODAY" button** on the active card (e.g. skip deadlift on a light week) — low-emphasis amber button sat below the set rows so it isn't fat-fingered, routed through the same "Not today?" confirm dialog (deliberate two-tap). Long-press on a pending/active card still skips too.
@@ -425,6 +434,7 @@ tool; Tier 3 = nice; Skip = don't build.
 | `app-icon.html` | 5 app-icon directions (Stacked Brutalist wordmark / IL Monogram / Dumbbell / A/B Split / Plate Edge) | Picked **05 Plate Edge**; final rendering uses "variant B" (solid disc + hole) not the concentric rings |
 | `logo.html` | 5 logo lockups (stacked / horizontal / plate+wordmark / stamp / IC monogram) | Stacked Brutalist is the primary lockup (splash) |
 | `appstore-screens.html` | 6 App Store screens at 1242×2688 (splash / home / active / rest / summary / progress) | Exported PNGs at `screenshots/*.png` via headless Chrome and used directly in App Store Connect. Render script: `render` shown in §16 |
+| `dropset.html` | 3 phone screens for the 1.04 drop-set UX (convert a set → log the ladder → logged/collapsed + history) + data-model spec | Approved; shipped as the `DropLadder` UI. Note: final impl adds drops *after* logging the top set (persist-per-stage, auto rest mgmt) rather than the pre-log ladder shown in the mockup — same visual result |
 
 ---
 
@@ -456,15 +466,20 @@ verified to match spec.
 ## 15. Distribution / App Store status
 
 **Current state (as of 2026-06-08):**
-- **1.04** — BUILT + SUBMITTED via EAS 2026-06-08. Ships **drop sets** + the
+- **1.04 (build 15)** — BUILT + SUBMITTED via EAS 2026-06-08 (binary uploaded to
+  ASC, processing). Ships **drop sets** + the
   **Reverse Machine Fly (Rear Delt)** rename + the **first additive
   (non-destructive) DB migration** (schema v10, `set_drops` table). It ALSO
   carries the 1.03 `⇄ Do Workout X instead` override, because those changes were
   still uncommitted in the working tree when 1.04 was built — so 1.04 bundles
   and supersedes 1.03. Bumped to 1.04 (not a new 1.03 build) to avoid colliding
   with the already-uploaded 1.03 build 14 in ASC. **Remaining manual ASC steps:**
-  create the 1.04 version → "What's New" → attach the processed build → **Add
-  for Review** (manual release).
+  create the 1.04 version → "What's New" → attach the processed **build 15** →
+  **Add for Review** (manual release). The Build picker stays empty until Apple
+  finishes processing the upload; the export-compliance prompt on the version
+  page is ASC boilerplate shown only while no build is attached — it
+  auto-resolves once build 15 is attached (`ITSAppUsesNonExemptEncryption:
+  false` is already in the binary). No encryption docs needed.
   - Drop sets: tap `⇊ DROP SET` under the last logged set of an exercise (works
     on the active card and the done card) → chain reduced-weight burnout stages,
     each auto-filled at 75% of the stage above. Rest is suppressed while a drop
