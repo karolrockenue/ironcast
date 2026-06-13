@@ -471,9 +471,21 @@ verified to match spec.
 
 ## 15. Distribution / App Store status
 
-**Current state (as of 2026-06-08):**
+**Current state (as of 2026-06-13):**
+- **1.05 (build 16)** — BUILT + SUBMITTED via EAS 2026-06-13 (binary uploaded to
+  ASC, processing). Ships the **deadlift heavy/technique removal** (schema v11,
+  additive migration clearing `special_rules='deadlift_ht'` → NULL) + **mid-workout
+  template editing** (`＋ ADD EXERCISE` on the active screen, `Remove from plan` in
+  the "Not today?" dialog). It supersedes 1.04 — 1.04's ASC version record was
+  never created either, so 1.05 is the next store version after the live 1.02.
+  Committed as `218276b`, pushed to `origin/main`. **Remaining manual ASC steps:**
+  create the 1.05 version → "What's New" → attach the processed **build 16** →
+  **Add for Review** (manual release). Build picker stays empty until Apple
+  finishes processing; export-compliance auto-resolves once build 16 is attached.
 - **1.04 (build 15)** — BUILT + SUBMITTED via EAS 2026-06-08 (binary uploaded to
-  ASC, processing). Ships **drop sets** + the
+  ASC, processing) but **never given an ASC version record** — superseded by 1.05
+  before reaching the store. Its features (drop sets, Rear Delt rename, schema v10
+  `set_drops`) carry forward in 1.05's binary. Ships **drop sets** + the
   **Reverse Machine Fly (Rear Delt)** rename + the **first additive
   (non-destructive) DB migration** (schema v10, `set_drops` table). It ALSO
   carries the 1.03 `⇄ Do Workout X instead` override, because those changes were
@@ -647,8 +659,8 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 
 ## 17. Next session — pick up here
 
-The 2026-06-11 session (uncommitted, not yet built) shipped two changes for the
-next store version (**1.05**):
+**1.05 (build 16) is BUILT + SUBMITTED** (2026-06-13, committed `218276b`, pushed).
+It shipped two changes:
 1. **Deadlift heavy/technique removed** — schema v11 (additive: clears
    `special_rules='deadlift_ht'`), deadlift is a normal 2 × 3–5 exercise. All
    mode UI (home preview, active banners, summary next-deadlift, template-editor
@@ -657,11 +669,13 @@ next store version (**1.05**):
    screen + `Remove from plan` in the "Not today?" dialog. Persistent template
    edits, history untouched.
 
-Status of 1.04 (build 15): built + submitted via EAS 2026-06-08; **ASC version
-record + "Add for Review" remain manual** (see §15). Apple Health is still the
-next meaningful gap and is blocked only on doing a one-time dev build.
+**Remaining for the store:** create the 1.05 ASC version record → "What's New" →
+attach the processed **build 16** → Add for Review (manual release, see §15).
+This also retires the never-released 1.04 (build 15) — its drop-set/Rear-Delt
+features ride along in 1.05's binary. Apple Health is still the next meaningful
+gap and is blocked only on doing a one-time dev build.
 
-Verify on-device after the 1.04 update installs: real workout history is
+Verify on-device after the 1.05 update installs: real workout history is
 **preserved** (additive migration, not a reseed) and the rear-delt rename
 appears in the exercise library.
 
