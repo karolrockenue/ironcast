@@ -27,7 +27,8 @@ import {
   getPrescribedExercises,
   getLastSetForExercise,
   getLastSessionSetsForExercise,
-  getTechniqueDeadliftWeight,
+  addExerciseToTemplate,
+  removeExerciseFromTemplate,
   decideProgression,
   detectPRsForSet1,
   addDrop,
@@ -42,8 +43,8 @@ import {
 import { useRestTimer } from "../../src/store/restTimer";
 import { RestTimerOverlay } from "../../src/components/RestTimerOverlay";
 import { PrCelebration } from "../../src/components/PrCelebration";
+import { workoutStore } from "../../src/store/workout";
 import { colors } from "../../src/theme/colors";
-import * as SQLite from "expo-sqlite";
 
 // ─── Helpers ───────────────────────────────────────────────
 function useElapsed() {
@@ -62,48 +63,20 @@ function fmt(t: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-type DeadliftMode = "heavy" | "technique" | null;
-
-async function fetchWorkoutMode(
-  db: SQLite.SQLiteDatabase,
-  workoutId: number
-): Promise<DeadliftMode> {
-  const row = await db.getFirstAsync<{ deadlift_mode: string | null }>(
-    "SELECT deadlift_mode FROM workouts WHERE id = ?",
-    [workoutId]
-  );
-  const mode = row?.deadlift_mode;
-  if (mode === "heavy" || mode === "technique") return mode;
-  return null;
-}
-
 // ─── Suggested weight logic ────────────────────────────────
 // The weight we pre-fill into the stepper for the next set of an exercise:
-//  - technique-day deadlift → 75% of last heavy
-//  - last set of this session (if any) → that weight
 //  - progression engine suggestion (based on last finished session)
 //  - else 0 (user picks)
 function suggestStartingWeight(
   ex: PrescribedExercise,
-  lastSet: LastSet | null,
-  deadliftMode: DeadliftMode,
-  techniqueWeight: number | null
+  lastSet: LastSet | null
 ): number {
-  if (
-    ex.special_rules === "deadlift_ht" &&
-    deadliftMode === "technique" &&
-    techniqueWeight !== null
-  ) {
-    return techniqueWeight;
-  }
   const p = decideProgression(
     {
       rep_min: ex.default_rep_min,
       rep_max: ex.default_rep_max,
       weight_increment: ex.weight_increment,
       special_rules: ex.special_rules,
-      deadlift_mode: deadliftMode,
-      technique_weight: techniqueWeight,
     },
     lastSet
   );
@@ -217,16 +190,6 @@ function repsTint(
 function roundToIncrement(weight: number, increment: number) {
   if (increment <= 0) return weight;
   return +(Math.round(weight / increment) * increment).toFixed(2);
-}
-
-// Back-off ratio, with deadlift technique-day override to straight sets (1.0).
-function effectiveBackOff(
-  ex: PrescribedExercise,
-  deadliftMode: DeadliftMode
-) {
-  if (ex.special_rules === "deadlift_ht" && deadliftMode === "technique")
-    return 1.0;
-  return ex.back_off_ratio;
 }
 
 const st = StyleSheet.create({
@@ -707,8 +670,6 @@ function ActiveCard({
   logged,
   lastSet,
   lastSessionSets,
-  deadliftMode,
-  techniqueWeight,
   dropsBySet,
   onLogSet,
   onDeleteSet,
@@ -722,8 +683,6 @@ function ActiveCard({
   logged: SetRow[];
   lastSet: LastSet | null;
   lastSessionSets: Map<number, LastSet>;
-  deadliftMode: DeadliftMode;
-  techniqueWeight: number | null;
   dropsBySet: Map<number, DropRow[]>;
   onLogSet: (setIdx: number, weight: number, reps: number) => void;
   onDeleteSet: (setId: number) => void;
@@ -733,16 +692,7 @@ function ActiveCard({
   onBeginDrop: () => void;
   onSkip: () => void;
 }) {
-  const isDeadlift = ex.special_rules === "deadlift_ht";
-  const isTechniqueDeadlift = isDeadlift && deadliftMode === "technique";
-  const isHeavyDeadlift = isDeadlift && deadliftMode === "heavy";
-
-  const suggested = suggestStartingWeight(
-    ex,
-    lastSet,
-    deadliftMode,
-    techniqueWeight
-  );
+  const suggested = suggestStartingWeight(ex, lastSet);
 
   // Per-set KG. Each row owns its own value: logged sets are locked to the
   // stored weight; pending sets default to the most recent logged set's weight,
@@ -751,7 +701,7 @@ function ActiveCard({
     logged.length > 0 ? logged[logged.length - 1].weight : suggested;
   const defaultPendingKg = lastLoggedWeight;
 
-  const backOff = effectiveBackOff(ex, deadliftMode);
+  const backOff = ex.back_off_ratio;
 
   // Initial Set 1 kg = last session's weight (or progression), Set 2+ = back-off.
   const [kgPerSet, setKgPerSet] = useState<number[]>(() =>
@@ -823,36 +773,14 @@ function ActiveCard({
         rep_max: ex.default_rep_max,
         weight_increment: ex.weight_increment,
         special_rules: ex.special_rules,
-        deadlift_mode: deadliftMode,
-        technique_weight: techniqueWeight,
       },
       lastSet
     );
     return p.message;
-  }, [ex, lastSet, deadliftMode, techniqueWeight]);
+  }, [ex, lastSet]);
 
   return (
     <View style={[c.card, c.cardActive]}>
-      {/* Deadlift H/T banner */}
-      {isHeavyDeadlift && (
-        <View style={[c.deadBanner, c.deadHeavy]}>
-          <Text style={[c.deadLabel, { color: colors.accent }]}>HEAVY DAY</Text>
-          <Text style={c.deadSub}>push it — track top set carefully</Text>
-        </View>
-      )}
-      {isTechniqueDeadlift && (
-        <View style={[c.deadBanner, c.deadTech]}>
-          <Text style={[c.deadLabel, { color: colors.warning }]}>
-            TECHNIQUE DAY
-          </Text>
-          <Text style={c.deadSub}>
-            {techniqueWeight != null
-              ? `75% of last heavy — ${techniqueWeight} kg · strict form`
-              : "Pick a light warm-up weight · strict form"}
-          </Text>
-        </View>
-      )}
-
       <Pressable
         style={c.hdr}
         onLongPress={onSkip}
@@ -1041,8 +969,6 @@ export default function ActiveWorkout() {
   const [lastSessionByEx, setLastSessionByEx] = useState<
     Map<number, Map<number, LastSet>>
   >(new Map());
-  const [deadliftMode, setDeadliftMode] = useState<DeadliftMode>(null);
-  const [techniqueWeight, setTechniqueWeight] = useState<number | null>(null);
   const [manualActiveId, setManualActiveId] = useState<number | null>(null);
   const [celebration, setCelebration] = useState<{
     kind: PRKind;
@@ -1053,43 +979,44 @@ export default function ActiveWorkout() {
   const [skipped, setSkipped] = useState<Set<number>>(new Set());
   const [dropsBySet, setDropsBySet] = useState<Map<number, DropRow[]>>(new Map());
 
-  // Load prescription + workout mode + last-session data
-  useEffect(() => {
+  // Load prescription + last-session data. Reusable so mid-workout template
+  // edits (add / remove exercise) can refresh the list in place.
+  const loadPrescription = useCallback(async () => {
     if (!templateId) return;
-    const tid = Number(templateId);
-    (async () => {
-      const [rows, mode, tech] = await Promise.all([
-        getPrescribedExercises(db, tid),
-        fetchWorkoutMode(db, workoutId),
-        getTechniqueDeadliftWeight(db),
+    const rows = await getPrescribedExercises(db, Number(templateId));
+    const byEx = new Map<number, LastSet>();
+    const bySession = new Map<number, Map<number, LastSet>>();
+    for (const p of rows) {
+      const [ls, session] = await Promise.all([
+        getLastSetForExercise(db, p.exercise_id, workoutId),
+        getLastSessionSetsForExercise(db, p.exercise_id, workoutId),
       ]);
-      // Deadlift day-variant override: heavy day uses 1 set, technique 2.
-      // Base seed stores default_sets=2 (matches technique); only heavy
-      // needs to be narrowed.
-      const adjusted = rows.map((r) =>
-        r.special_rules === "deadlift_ht" && mode === "heavy"
-          ? { ...r, default_sets: 1 }
-          : r
-      );
-      const byEx = new Map<number, LastSet>();
-      const bySession = new Map<number, Map<number, LastSet>>();
-      for (const p of rows) {
-        const [ls, session] = await Promise.all([
-          getLastSetForExercise(db, p.exercise_id, workoutId),
-          getLastSessionSetsForExercise(db, p.exercise_id, workoutId),
-        ]);
-        if (ls) byEx.set(p.exercise_id, ls);
-        if (session.size > 0) bySession.set(p.exercise_id, session);
-      }
-      // Set everything in one render so ActiveCard's state initializer sees
-      // a populated lastSessionSets map (used to pre-fill reps).
-      setLastSetByEx(byEx);
-      setLastSessionByEx(bySession);
-      setDeadliftMode(mode);
-      setTechniqueWeight(tech);
-      setPrescribed(adjusted);
-    })();
+      if (ls) byEx.set(p.exercise_id, ls);
+      if (session.size > 0) bySession.set(p.exercise_id, session);
+    }
+    // Set everything in one render so ActiveCard's state initializer sees
+    // a populated lastSessionSets map (used to pre-fill reps).
+    setLastSetByEx(byEx);
+    setLastSessionByEx(bySession);
+    setPrescribed(rows);
   }, [db, templateId, workoutId]);
+  useEffect(() => {
+    loadPrescription();
+  }, [loadPrescription]);
+
+  // Exercise picked from the modal picker → append to the template (persistent
+  // template edit, applies to future sessions too) and refresh the list.
+  useEffect(() => {
+    return workoutStore.subscribe(async () => {
+      if (workoutStore.getContext() !== "workout") return;
+      const picked = workoutStore.getExercise();
+      if (picked && templateId) {
+        await addExerciseToTemplate(db, Number(templateId), picked.id);
+        workoutStore.setExercise(null);
+        await loadPrescription();
+      }
+    });
+  }, [db, templateId, loadPrescription]);
 
   const reload = useCallback(async () => {
     const [rows, skip, dropRows] = await Promise.all([
@@ -1237,18 +1164,37 @@ export default function ActiveWorkout() {
 
   const handleSkip = (ex: PrescribedExercise) => {
     Haptics.selectionAsync();
-    Alert.alert("Not today?", `Skip ${ex.exercise_name} for this session?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Skip it",
-        style: "destructive",
-        onPress: async () => {
-          await skipExercise(db, workoutId, ex.exercise_id);
-          if (manualActiveId === ex.exercise_id) setManualActiveId(null);
-          await reload();
+    Alert.alert(
+      "Not today?",
+      `Skip ${ex.exercise_name} for this session, or remove it from the plan entirely?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove from plan",
+          style: "destructive",
+          onPress: async () => {
+            // Persistent template edit — gone from this and future sessions.
+            // Any sets already logged stay in history.
+            await removeExerciseFromTemplate(db, ex.id);
+            if (manualActiveId === ex.exercise_id) setManualActiveId(null);
+            await loadPrescription();
+          },
         },
-      },
-    ]);
+        {
+          text: "Skip it",
+          onPress: async () => {
+            await skipExercise(db, workoutId, ex.exercise_id);
+            if (manualActiveId === ex.exercise_id) setManualActiveId(null);
+            await reload();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleAddExercise = () => {
+    workoutStore.setContext("workout");
+    router.push("/workout/pick-exercise");
   };
 
   const handleUnskip = (ex: PrescribedExercise) => {
@@ -1341,7 +1287,11 @@ export default function ActiveWorkout() {
   };
 
   const totalPrescribed = prescribed.reduce((s, p) => s + p.default_sets, 0);
-  const completed = sets.length;
+  // Count only sets of exercises still in the plan — an exercise removed
+  // mid-workout keeps its logged sets in the DB but not in this counter.
+  const completed = sets.filter((s) =>
+    prescribed.some((p) => p.exercise_id === s.exercise_id)
+  ).length;
 
   return (
     <View style={m.root}>
@@ -1392,8 +1342,6 @@ export default function ActiveWorkout() {
                 lastSessionSets={
                   lastSessionByEx.get(ex.exercise_id) ?? new Map()
                 }
-                deadliftMode={deadliftMode}
-                techniqueWeight={techniqueWeight}
                 dropsBySet={dropsBySet}
                 onLogSet={(idx, w, r) => handleLogSet(ex, idx, w, r)}
                 onDeleteSet={handleDeleteSet}
@@ -1414,6 +1362,11 @@ export default function ActiveWorkout() {
             />
           );
         })}
+
+        {/* Mid-workout template edit — appends to the plan permanently. */}
+        <Pressable style={m.addExBtn} onPress={handleAddExercise} hitSlop={6}>
+          <Text style={m.addExText}>＋ ADD EXERCISE</Text>
+        </Pressable>
       </ScrollView>
 
       <RestTimerOverlay
@@ -1506,6 +1459,22 @@ const m = StyleSheet.create({
     alignItems: "center",
   },
   finishText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  addExBtn: {
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(74,144,217,0.5)",
+    marginTop: 4,
+  },
+  addExText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
 });
 
 const c = StyleSheet.create({
@@ -1665,23 +1634,6 @@ const c = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
   },
-
-  deadBanner: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderLeftWidth: 3,
-  },
-  deadHeavy: {
-    backgroundColor: "rgba(74,144,217,0.12)",
-    borderLeftColor: colors.accent,
-  },
-  deadTech: {
-    backgroundColor: "rgba(255,167,38,0.12)",
-    borderLeftColor: colors.warning,
-  },
-  deadLabel: { fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },
-  deadSub: { color: colors.text, fontSize: 12, marginTop: 2 },
 
   coach: {
     borderLeftWidth: 3,

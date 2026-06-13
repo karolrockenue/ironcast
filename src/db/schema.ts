@@ -20,7 +20,10 @@ import * as SQLite from "expo-sqlite";
 //     change shipped AFTER the app went live, so the migration is ADDITIVE
 //     for live installs (v9+) — it preserves logged workouts instead of the
 //     historical nuke-and-reseed (see initDB).
-const SCHEMA_VERSION = 10;
+// v11: deadlift heavy/technique alternation removed — clear the 'deadlift_ht'
+//     special rule so Deadlift progresses like any other exercise. The
+//     workouts.deadlift_mode column stays as read-only history.
+const SCHEMA_VERSION = 11;
 
 type ExerciseSeed = {
   name: string;
@@ -55,7 +58,7 @@ const WORKOUT_A: ExerciseSeed[] = [
 ];
 
 const WORKOUT_B: ExerciseSeed[] = [
-  { name: "Deadlift (Barbell)",                category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 3,  default_rep_max: 5,  default_rest_seconds: 180, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: "deadlift_ht" },
+  { name: "Deadlift (Barbell)",                category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 3,  default_rep_max: 5,  default_rest_seconds: 180, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Shoulder Press (Machine Plates)",   category: "push",  movement_type: "Compound",  muscle_group: "Shoulders", default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Lat Pulldown (Cable)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 150, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.80, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Seated Row (Machine)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 120, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
@@ -301,6 +304,13 @@ async function migrateForward(db: SQLite.SQLiteDatabase, from: number) {
       ["Reverse Machine Fly (Rear Delt)", "Reverse Pec Deck"]
     );
   }
+  if (from < 11) {
+    // v11: heavy/technique deadlift alternation removed. Clearing the rule
+    // makes Deadlift a normal exercise (2 sets, standard progression).
+    await db.runAsync(
+      "UPDATE exercises SET special_rules = NULL WHERE special_rules = 'deadlift_ht'"
+    );
+  }
 }
 
 async function createSchema(db: SQLite.SQLiteDatabase) {
@@ -447,7 +457,7 @@ async function seedExercisesAndPlans(db: SQLite.SQLiteDatabase) {
 //   "Leg Raise Parallel Bars" → "Hanging Leg Raises"
 //   "Plank"                   → skipped (not in current plan; no time tracking)
 //
-// Deadlift in Apr 15 B is marked HEAVY; next B will be TECHNIQUE.
+// The Apr 15 B deadlift keeps its historical 'heavy' tag (read-only legacy).
 type HistoricalSession = {
   date: string;            // "YYYY-MM-DD HH:MM:SS" (UTC)
   duration_min: number;

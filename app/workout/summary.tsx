@@ -46,8 +46,6 @@ function progColor(dir: WorkoutProgression["progression"]["direction"]) {
       return colors.warning;
     case "reps_only":
       return colors.success;
-    case "technique":
-      return colors.warning;
     default:
       return colors.textSecondary;
   }
@@ -63,8 +61,6 @@ function progIcon(dir: WorkoutProgression["progression"]["direction"]) {
       return "\u2193";
     case "reps_only":
       return "+1";
-    case "technique":
-      return "\u00B7";
     default:
       return "\u2022";
   }
@@ -111,33 +107,6 @@ export default function Summary() {
         </View>
       </View>
 
-      {/* Next deadlift mode preview (only for B sessions) */}
-      {data.next_deadlift_mode && (
-        <View style={s.deadPreview}>
-          <Text style={s.deadPreviewLabel}>NEXT DEADLIFT</Text>
-          <Text
-            style={[
-              s.deadPreviewVal,
-              {
-                color:
-                  data.next_deadlift_mode === "heavy"
-                    ? colors.accent
-                    : colors.warning,
-              },
-            ]}
-          >
-            {data.next_deadlift_mode === "heavy"
-              ? "Heavy Day"
-              : "Technique Day"}
-          </Text>
-          <Text style={s.deadPreviewSub}>
-            {data.next_deadlift_mode === "heavy"
-              ? "Push it — progression resumes"
-              : "75% of this session's heavy, strict form"}
-          </Text>
-        </View>
-      )}
-
       {/* PRs */}
       {data.prs.length > 0 && (
         <View style={{ marginTop: 6 }}>
@@ -182,8 +151,7 @@ export default function Summary() {
                   <Text style={s.progMsg}>{p.progression.message}</Text>
                 </View>
                 {(p.progression.direction === "increase" ||
-                  p.progression.direction === "decrease" ||
-                  p.progression.direction === "technique") && (
+                  p.progression.direction === "decrease") && (
                   <Text style={[s.progWeight, { color: col }]}>
                     {p.progression.suggested_weight} kg
                   </Text>
@@ -244,27 +212,6 @@ const s = StyleSheet.create({
     marginTop: 4,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-
-  deadPreview: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 14,
-    alignItems: "center",
-  },
-  deadPreviewLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.5,
-  },
-  deadPreviewVal: { fontSize: 22, fontWeight: "900", marginTop: 4 },
-  deadPreviewSub: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 4,
-    textAlign: "center",
   },
 
   sectionTitle: {

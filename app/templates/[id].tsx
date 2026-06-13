@@ -133,8 +133,6 @@ export default function TemplateEditor() {
     await reload();
   };
 
-  const isDeadlift = editing?.special_rules === "deadlift_ht";
-
   return (
     <View style={styles.container}>
       <View style={styles.nameRow}>
@@ -169,8 +167,6 @@ export default function TemplateEditor() {
           const modeSuffix: string[] = [];
           if (item.is_per_arm) modeSuffix.push("per arm");
           if (item.weight_display_mode === "per_hand") modeSuffix.push("per hand");
-          if (item.special_rules === "deadlift_ht")
-            modeSuffix.push("heavy / technique alternating");
           return (
             <View style={styles.exerciseRow}>
               <View style={styles.exerciseInfo}>
@@ -245,13 +241,7 @@ export default function TemplateEditor() {
 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>SETS</Text>
-              {isDeadlift ? (
-                <Text style={styles.fieldLocked}>
-                  Auto — heavy 1 · technique 2
-                </Text>
-              ) : (
-                <Stepper value={eSets} min={1} max={6} onChange={setESets} />
-              )}
+              <Stepper value={eSets} min={1} max={6} onChange={setESets} />
             </View>
 
             <View style={styles.field}>

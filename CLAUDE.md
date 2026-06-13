@@ -1,6 +1,6 @@
 # IronCast — Project Blueprint
 
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-11
 
 IronCast (renamed from IronLog on 2026-04-20; `IronLog` was already on the App
 Store) is a React Native / Expo app for guided strength training. It alternates
@@ -49,7 +49,7 @@ No cloud sync, no account system, no telemetry. All data lives on-device.
 - **Set 1 = top working set.** Set 2 = back-off set (a *separate* set after full rest, weight = Set 1 × back-off ratio). The progression engine reads Set 1; Set 2 is informational. **NB — not to be confused with true drop sets** (added in 1.04, §10): those are within-set burnout stages done with *no rest*, stored in `set_drops` and hung off a single parent set. "Back-off Set 2" and "drop set" are different mechanisms.
 - **Automatic weight progression.** Hit top of rep range → increase by the exercise's equipment increment next time. In range (not at top) → same weight, push for more reps. Below range → drop one increment.
 - **Back-off ratio** on Set 2 is per-exercise (0.80 for Lat Pulldown, 0.90 standard, 1.00 for single-arm lateral raise and hanging leg raises).
-- **Deadlift alternates heavy ↔ technique** across successive B sessions (see §4).
+- **Deadlift heavy/technique alternation REMOVED (2026-06-11, schema v11).** Deadlift is now a normal 2 × 3–5 exercise with standard progression and 0.90 back-off. The "NOT TODAY" skip covers light weeks. See §4.
 - **Rest timer** is mandatory, prescribed per exercise, runs in the background, notifies on completion.
 
 ---
@@ -72,7 +72,7 @@ Both are 7 exercises. Values from Addendum 3 + 4.
 ### Workout B — Pull + Shoulders + Biceps
 | # | Exercise | Sets × Reps | Rest | Increment | Back-off |
 |---|----------|-------------|------|-----------|----------|
-| 1 | Deadlift (Barbell) — **day variant** | Heavy: 1×3–5  /  Technique: 2×3–5 | 3:00 | 2.5 kg | 0.90 heavy / 1.00 tech |
+| 1 | Deadlift (Barbell)                | 2 × 3–5    | 3:00 | 2.5 kg | 0.90 |
 | 2 | Shoulder Press (Machine Plates)   | 2 × 5–8    | 2:30 | 2.5 kg | 0.90 |
 | 3 | Lat Pulldown (Cable)              | 2 × 5–8    | 2:30 | **5 kg** | **0.80** |
 | 4 | Seated Row (Machine)              | 2 × 6–10   | 2:00 | 5 kg | 0.90 |
@@ -82,19 +82,23 @@ Both are 7 exercises. Values from Addendum 3 + 4.
 
 ---
 
-## 4. Deadlift day variants (Addendum 4)
+## 4. Deadlift day variants — REMOVED (2026-06-11)
 
-Deadlift is the only exercise with day-dependent set structure.
+The heavy/technique alternation (Addendum 4) was removed in schema v11.
+Deadlift is now a normal exercise: 2 × 3–5, standard progression, 0.90
+back-off. Rationale: the "NOT TODAY" per-session skip already covers light
+weeks, and the mode machinery complicated every screen.
 
-| Mode        | Sets | Reps  | Weight source                        | Progression          |
-|-------------|------|-------|--------------------------------------|----------------------|
-| Heavy Day   | 1    | 3–5   | Standard progression from last heavy | Normal rules apply   |
-| Technique Day | 2  | 3–5   | **75 % of last heavy**, rounded to 2.5 kg (ties go down), both sets same | **None** — technique doesn't progress |
+What remains for history: `workouts.deadlift_mode` column (read-only legacy,
+still in the CSV export), and the Apr 15 seed session's `heavy` tag. The v11
+migration clears `special_rules = 'deadlift_ht'` → NULL on live installs;
+`getNextDeadliftMode` / `getLastHeavyDeadliftWeight` /
+`getTechniqueDeadliftWeight` and the `technique` progression direction were
+deleted from `queries.ts`.
 
-Alternation: every B session flips the mode. Historical B sessions are all
-flagged `heavy`, so the next B = **technique**.
-
-Current technique weight on first launch: 95 × 0.75 = 71.25 → **70 kg**.
+⚠️ One-time progression quirk: the engine reads the most recent finished Set 1
+regardless of historical mode — if the last logged B was a 70 kg technique day,
+the next suggestion starts from 70 kg and self-corrects as you lift.
 
 ---
 
@@ -108,7 +112,6 @@ reps ≥ rep_max           → increase weight by weight_increment
 reps in [rep_min, rep_max) → same weight, aim for more reps
 reps < rep_min           → reduce weight by weight_increment
 weight_increment === 0   → reps-only progression (Hanging Leg Raises)
-deadlift technique day   → override to 75 % of last heavy, no progression
 ```
 
 Implemented in `src/db/queries.ts → decideProgression()`.
@@ -123,7 +126,7 @@ Example transitions based on historical data (as of 2026-04-19):
 | Leg Extension       | 73 × 11 | 73 kg, push for 12 |
 | Tricep Pushdown     | 7.5 × 9 | 7.5 kg, push for 12 |
 | Lateral Raise       | 30 × 6  | 27.5 kg (below range, -2.5) |
-| Deadlift            | 95 × 4 (heavy) | **70 kg × 2 sets (technique)** |
+| Deadlift            | 95 × 4  | 95 kg, push for 5 (modes removed — standard rules) |
 | Shoulder Press      | 80 × 5  | 80 kg, push for 8 |
 | Lat Pulldown        | 60 × 4  | 55 kg (below range, -5) |
 | Seated Row          | 60 × 8  | 60 kg, push for 10 |
@@ -199,7 +202,8 @@ template_exercises
   id, template_id, exercise_id, sort_order
 ```
 
-`PRAGMA user_version` drives migrations. Current version: **10**.
+`PRAGMA user_version` drives migrations. Current version: **11** (v11 clears
+`special_rules = 'deadlift_ht'` → NULL; deadlift modes removed, see §4).
 
 **Migrations are no longer always destructive (changed 2026-06-08).** v9 shipped
 to the App Store, so `initDB` now branches: a fresh install (`user_version 0`)
@@ -269,8 +273,7 @@ Skipped from source data: Plank (time-based, not in plan), older sessions
 
 Derived state on first launch:
 - **Next workout:** B
-- **Next deadlift mode:** technique (last was heavy)
-- **Technique weight:** 70 kg (95 × 0.75, ties go down)
+- (Deadlift modes removed 2026-06-11 — the seed session's `heavy` tag is legacy.)
 
 ---
 
@@ -309,10 +312,8 @@ Derived state on first launch:
 
 ### Smart behaviour
 - [x] Strict A/B alternation from last *finished* session's template
-- [x] **Override alternation for today** — `⇄ Do Workout X instead` switch on the home next-up card swaps A↔B for the current session only. Per-visit (resets on tab focus), recomputes deadlift mode/weight for the displayed plan, shows a "normally Workout Y" note when overriding. No persistence — alternation self-corrects from the next *finished* session.
-- [x] Deadlift heavy/technique alternation (last heavy → next technique)
-- [x] Deadlift heavy = 1 set, technique = 2 sets
-- [x] Technique weight = 75 % of last heavy's top set, rounded to 2.5 kg (ties down)
+- [x] **Override alternation for today** — `⇄ Do Workout X instead` switch on the home next-up card swaps A↔B for the current session only. Per-visit (resets on tab focus), shows a "normally Workout Y" note when overriding. No persistence — alternation self-corrects from the next *finished* session.
+- ~~Deadlift heavy/technique alternation~~ — REMOVED 2026-06-11 (schema v11, see §4)
 - [x] Back-off Set 2 weight auto-recalculates after Set 1 is logged
 - [x] Progression engine using Set 1 (top set), not last numerical set
 - [x] Per-set `last · X kg` / `last · R` reference under each working set row
@@ -348,6 +349,11 @@ Derived state on first launch:
 - [x] **Volume rollups include drops** — summary hero `total_volume` + `total_reps`, Progress-tab total volume, and CSV export all add drop volume. Per-exercise volume used for the volume-PR comparison stays parent-only (consistent with the historical query, so drops never trigger a false PR).
 - [x] **Rendered after the fact** — History detail shows the `↳ 10 kg × 11   7.5 kg × 9` ladder + a `DROP` badge; Summary shows `· +N drops` on the exercise line. CSV export gains a `drop` column (0 = top set, 1..n = drop stage).
 - [x] Delete a logged drop with its `×`; `deleteSet`/`deleteWorkout` clear drops explicitly (no FK-cascade reliance). Mockup: `mockups/dropset.html`.
+
+### Mid-workout template editing (added 2026-06-11)
+- [x] **`＋ ADD EXERCISE` button** at the bottom of the active session list → opens the existing `pick-exercise` modal (workoutStore context `"workout"`) → `addExerciseToTemplate` → prescription reloads in place with last-session data for the new exercise. **Persistent template edit** — applies to future sessions too.
+- [x] **`Remove from plan` option** in the "Not today?" dialog (alongside Cancel / Skip it) → `removeExerciseFromTemplate`. Already-logged sets stay in the DB/history; the card disappears from the session. The header sets counter excludes sets of removed exercises.
+- [x] `addExerciseToTemplate` is now a no-op if the exercise is already in the template (active screen keys state by `exercise_id`, duplicates would corrupt it).
 
 ### Exercise navigation & skip (active session)
 - [x] Tap any pending card to jump — `manualActiveId` state
@@ -641,11 +647,18 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 
 ## 17. Next session — pick up here
 
-The 2026-06-08 session shipped **drop sets**, the **Reverse Machine Fly (Rear
-Delt)** rename, and the **first additive DB migration** (schema v10) as **1.04**
-— built + submitted via EAS. 1.04 also carries the prior 1.03 workout-override
-(it was uncommitted), so 1.03 is abandoned on the store. **ASC version record +
-"Add for Review" for 1.04 remain manual** (see §15). Apple Health is still the
+The 2026-06-11 session (uncommitted, not yet built) shipped two changes for the
+next store version (**1.05**):
+1. **Deadlift heavy/technique removed** — schema v11 (additive: clears
+   `special_rules='deadlift_ht'`), deadlift is a normal 2 × 3–5 exercise. All
+   mode UI (home preview, active banners, summary next-deadlift, template-editor
+   sets lock) deleted.
+2. **Mid-workout template editing** — `＋ ADD EXERCISE` button on the active
+   screen + `Remove from plan` in the "Not today?" dialog. Persistent template
+   edits, history untouched.
+
+Status of 1.04 (build 15): built + submitted via EAS 2026-06-08; **ASC version
+record + "Add for Review" remain manual** (see §15). Apple Health is still the
 next meaningful gap and is blocked only on doing a one-time dev build.
 
 Verify on-device after the 1.04 update installs: real workout history is

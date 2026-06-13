@@ -212,11 +212,18 @@ export async function updateExercisePrescription(
   );
 }
 
+// No-op if the exercise is already in the template — the active screen keys
+// state by exercise_id, so duplicate rows would corrupt it.
 export async function addExerciseToTemplate(
   db: SQLite.SQLiteDatabase,
   templateId: number,
   exerciseId: number
 ) {
+  const existing = await db.getFirstAsync<{ id: number }>(
+    "SELECT id FROM template_exercises WHERE template_id = ? AND exercise_id = ?",
+    [templateId, exerciseId]
+  );
+  if (existing) return;
   const max = await db.getFirstAsync<{ m: number | null }>(
     "SELECT MAX(sort_order) as m FROM template_exercises WHERE template_id = ?",
     [templateId]
@@ -267,12 +274,11 @@ export async function moveTemplateExercise(
 
 export async function startWorkout(
   db: SQLite.SQLiteDatabase,
-  opts: { templateId?: number; deadliftMode?: "heavy" | "technique" } = {}
+  opts: { templateId?: number } = {}
 ) {
-  const { templateId, deadliftMode } = opts;
   const result = await db.runAsync(
-    "INSERT INTO workouts (template_id, deadlift_mode) VALUES (?, ?)",
-    [templateId ?? null, deadliftMode ?? null]
+    "INSERT INTO workouts (template_id) VALUES (?)",
+    [opts.templateId ?? null]
   );
   return result.lastInsertRowId;
 }
@@ -413,8 +419,6 @@ export type WorkoutHistoryRow = Workout & {
   exercise_count: number;
   set_count: number;
   template_name: string | null;
-  deadlift_weight: number | null;
-  deadlift_reps: number | null;
 };
 
 export async function getWorkoutHistory(db: SQLite.SQLiteDatabase) {
@@ -422,15 +426,7 @@ export async function getWorkoutHistory(db: SQLite.SQLiteDatabase) {
     `SELECT w.*,
        COUNT(DISTINCT s.exercise_id) as exercise_count,
        COUNT(s.id) as set_count,
-       t.name as template_name,
-       (SELECT s2.weight FROM sets s2
-          JOIN exercises e2 ON e2.id = s2.exercise_id
-          WHERE s2.workout_id = w.id AND e2.special_rules = 'deadlift_ht'
-          ORDER BY s2.weight DESC, s2.reps DESC LIMIT 1) as deadlift_weight,
-       (SELECT s2.reps FROM sets s2
-          JOIN exercises e2 ON e2.id = s2.exercise_id
-          WHERE s2.workout_id = w.id AND e2.special_rules = 'deadlift_ht'
-          ORDER BY s2.weight DESC, s2.reps DESC LIMIT 1) as deadlift_reps
+       t.name as template_name
      FROM workouts w
      LEFT JOIN sets s ON s.workout_id = w.id
      LEFT JOIN templates t ON t.id = w.template_id
@@ -541,56 +537,6 @@ export async function getNextWorkoutPlan(db: SQLite.SQLiteDatabase) {
   );
 }
 
-// Deadlift heavy/technique alternation — driven by the last *finished* B
-// session's deadlift_mode. First B ever is heavy.
-export async function getNextDeadliftMode(
-  db: SQLite.SQLiteDatabase
-): Promise<"heavy" | "technique"> {
-  const row = await db.getFirstAsync<{ deadlift_mode: string | null }>(
-    `SELECT w.deadlift_mode
-     FROM workouts w
-     JOIN templates t ON t.id = w.template_id
-     WHERE w.finished_at IS NOT NULL AND t.name = 'Workout B'
-     ORDER BY w.started_at DESC LIMIT 1`
-  );
-  if (!row || row.deadlift_mode === "technique") return "heavy";
-  return "technique";
-}
-
-// Heaviest set weight from the most recent finished *heavy* deadlift session.
-// Drives both the technique-day prescription and the home-screen preview.
-export async function getLastHeavyDeadliftWeight(
-  db: SQLite.SQLiteDatabase
-): Promise<number | null> {
-  const row = await db.getFirstAsync<{ w: number }>(
-    `SELECT MAX(s.weight) as w
-     FROM sets s
-     JOIN exercises e ON e.id = s.exercise_id
-     WHERE s.workout_id = (
-       SELECT w2.id FROM workouts w2
-       JOIN sets s2 ON s2.workout_id = w2.id
-       JOIN exercises e2 ON e2.id = s2.exercise_id
-       WHERE w2.finished_at IS NOT NULL
-         AND w2.deadlift_mode = 'heavy'
-         AND e2.special_rules = 'deadlift_ht'
-       ORDER BY w2.started_at DESC LIMIT 1
-     )
-     AND e.special_rules = 'deadlift_ht'`
-  );
-  return row?.w ?? null;
-}
-
-// Technique-day weight = 75% of the most recent *heavy* deadlift's top set,
-// rounded to the nearest 2.5 kg (ties go down per spec example: 95 × 0.75 = 71.25 → 70).
-export async function getTechniqueDeadliftWeight(
-  db: SQLite.SQLiteDatabase
-): Promise<number | null> {
-  const heavy = await getLastHeavyDeadliftWeight(db);
-  if (heavy == null) return null;
-  const raw = heavy * 0.75;
-  return Math.ceil(raw / 2.5 - 0.5) * 2.5;
-}
-
 // ───────────────────────────────────────────────────────────
 // Progression engine
 // ───────────────────────────────────────────────────────────
@@ -600,7 +546,6 @@ export type ProgressionDirection =
   | "same"
   | "decrease"
   | "reps_only"
-  | "technique"
   | "none";
 
 export type Progression = {
@@ -616,31 +561,12 @@ type ProgressionInput = {
   rep_max: number;
   weight_increment: number;
   special_rules?: string | null;
-  deadlift_mode?: "heavy" | "technique" | null;
-  technique_weight?: number | null; // pre-computed 75%-of-heavy
 };
 
 export function decideProgression(
   ex: ProgressionInput,
   lastSet: { weight: number; reps: number } | null
 ): Progression {
-  // Technique-day deadlift never progresses weight — it prescribes 75%
-  if (
-    ex.special_rules === "deadlift_ht" &&
-    ex.deadlift_mode === "technique"
-  ) {
-    const w = ex.technique_weight ?? 0;
-    return {
-      direction: "technique",
-      suggested_weight: w,
-      last_weight: lastSet?.weight ?? 0,
-      last_reps: lastSet?.reps ?? 0,
-      message: w > 0
-        ? `Technique day — ${w} kg (75% of last heavy)`
-        : "Technique day — pick a light warm-up weight",
-    };
-  }
-
   if (!lastSet) {
     return {
       direction: "none",
@@ -787,8 +713,6 @@ export type WorkoutSummary = {
     drops: number; // count of drop-set burnout stages logged for this exercise
   }[];
   prs: PR[];
-  deadlift_mode: "heavy" | "technique" | null;
-  next_deadlift_mode: "heavy" | "technique" | null;
 };
 
 export async function getWorkoutSummary(
@@ -917,12 +841,6 @@ export async function getWorkoutSummary(
     }
   }
 
-  // Next deadlift mode preview (only for B sessions)
-  let next_deadlift_mode: "heavy" | "technique" | null = null;
-  const mode = workout?.deadlift_mode ?? null;
-  if (mode === "heavy") next_deadlift_mode = "technique";
-  else if (mode === "technique") next_deadlift_mode = "heavy";
-
   return {
     duration_min,
     total_sets,
@@ -937,8 +855,6 @@ export async function getWorkoutSummary(
       drops: dropCountByEx.get(exId) ?? 0,
     })),
     prs,
-    deadlift_mode: mode,
-    next_deadlift_mode,
   };
 }
 
@@ -967,7 +883,6 @@ export async function getWorkoutProgressions(
     special_rules: string | null;
     last_weight: number;
     last_reps: number;
-    deadlift_mode: "heavy" | "technique" | null;
   }>(
     `SELECT
        s.exercise_id,
@@ -977,11 +892,9 @@ export async function getWorkoutProgressions(
        e.weight_increment as weight_increment,
        e.special_rules as special_rules,
        s.weight as last_weight,
-       s.reps as last_reps,
-       wk.deadlift_mode as deadlift_mode
+       s.reps as last_reps
      FROM sets s
      JOIN exercises e ON e.id = s.exercise_id
-     JOIN workouts wk ON wk.id = s.workout_id
      WHERE s.workout_id = ?
        AND s.set_number = (
          SELECT MIN(set_number) FROM sets
@@ -990,9 +903,6 @@ export async function getWorkoutProgressions(
      ORDER BY s.id`,
     [workoutId]
   );
-
-  // For technique-day deadlifts, compute the 75% figure once.
-  const techniqueWeight = await getTechniqueDeadliftWeight(db);
 
   return rows.map((r) => ({
     exercise_name: r.exercise_name,
@@ -1004,8 +914,6 @@ export async function getWorkoutProgressions(
         rep_max: r.rep_max,
         weight_increment: r.weight_increment,
         special_rules: r.special_rules,
-        deadlift_mode: r.deadlift_mode,
-        technique_weight: techniqueWeight,
       },
       { weight: r.last_weight, reps: r.last_reps }
     ),

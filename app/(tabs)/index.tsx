@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useDB } from "../../src/db/provider";
@@ -6,9 +6,6 @@ import {
   startWorkout,
   getNextWorkoutPlan,
   getAllTemplates,
-  getNextDeadliftMode,
-  getTechniqueDeadliftWeight,
-  getLastHeavyDeadliftWeight,
   getUnfinishedWorkout,
   getWorkoutHistory,
   TemplateWithCount,
@@ -61,11 +58,6 @@ export default function WorkoutTab() {
   const [autoPlan, setAutoPlan] = useState<TemplateWithCount | null>(null);
   const [templates, setTemplates] = useState<TemplateWithCount[]>([]);
   const [chosenName, setChosenName] = useState<string | null>(null);
-  const [deadliftMode, setDeadliftMode] = useState<"heavy" | "technique" | null>(
-    null
-  );
-  const [techniqueWeight, setTechniqueWeight] = useState<number | null>(null);
-  const [lastHeavyWeight, setLastHeavyWeight] = useState<number | null>(null);
   const [unfinished, setUnfinished] = useState<
     (Workout & { template_name: string | null }) | null
   >(null);
@@ -100,39 +92,9 @@ export default function WorkoutTab() {
     ? templates.find((t) => t.name === chosenName) ?? autoPlan
     : autoPlan;
 
-  // Deadlift mode/weight only matter for Workout B — refetch whenever the
-  // displayed plan changes (so switching A→B fills in the preview correctly).
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (nextPlan?.name === "Workout B") {
-        const [mode, tech, heavy] = await Promise.all([
-          getNextDeadliftMode(db),
-          getTechniqueDeadliftWeight(db),
-          getLastHeavyDeadliftWeight(db),
-        ]);
-        if (!alive) return;
-        setDeadliftMode(mode);
-        setTechniqueWeight(tech);
-        setLastHeavyWeight(heavy);
-      } else {
-        setDeadliftMode(null);
-        setTechniqueWeight(null);
-        setLastHeavyWeight(null);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [db, nextPlan?.name]);
-
   const handleStart = async () => {
     if (!nextPlan) return;
-    const mode = nextPlan.name === "Workout B" ? deadliftMode : null;
-    const id = await startWorkout(db, {
-      templateId: nextPlan.id,
-      deadliftMode: mode ?? undefined,
-    });
+    const id = await startWorkout(db, { templateId: nextPlan.id });
     router.push({
       pathname: "/workout/active",
       params: { id: String(id), templateId: String(nextPlan.id) },
@@ -164,22 +126,6 @@ export default function WorkoutTab() {
         (t.name === "Workout A" || t.name === "Workout B") &&
         t.name !== nextPlan?.name
     ) ?? null;
-
-  // Deadlift descriptor for today's next-up (B only)
-  let deadliftNote: string | null = null;
-  if (nextPlan?.name === "Workout B") {
-    if (deadliftMode === "technique" && techniqueWeight != null) {
-      deadliftNote = `Technique Day · Deadlift 2 × 3–5 @ ${techniqueWeight} kg${
-        lastHeavyWeight ? ` (75% of ${lastHeavyWeight})` : ""
-      }`;
-    } else if (deadliftMode === "heavy") {
-      deadliftNote = `Heavy Day · Deadlift 1 × 3–5${
-        lastHeavyWeight ? ` @ ${lastHeavyWeight} kg` : ""
-      }`;
-    } else if (deadliftMode === "technique") {
-      deadliftNote = "Technique Day · Deadlift 2 × 3–5";
-    }
-  }
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -223,9 +169,6 @@ export default function WorkoutTab() {
               Overriding alternation · normally {autoPlan.name}
             </Text>
           )}
-          {deadliftNote && (
-            <Text style={[styles.note, styles.noteNext]}>{deadliftNote}</Text>
-          )}
           <Pressable style={[styles.btn, styles.btnAccent]} onPress={handleStart}>
             <Text style={styles.btnText}>START WORKOUT {planLetter}</Text>
           </Pressable>
@@ -245,19 +188,7 @@ export default function WorkoutTab() {
       {/* Past sessions — reverse chronological */}
       {history.map((h) => {
         const { weekday, monthDay } = fmtDay(h.started_at);
-        const plan = planLetterOf(h.template_name);
         const dur = fmtDurationMin(h.started_at, h.finished_at);
-        // Build the deadlift note for B sessions that recorded a deadlift.
-        let note: string | null = null;
-        if (
-          plan === "B" &&
-          h.deadlift_weight != null &&
-          h.deadlift_reps != null
-        ) {
-          const modeLabel =
-            h.deadlift_mode === "technique" ? "Technique" : "Heavy";
-          note = `${modeLabel} · DL ${h.deadlift_weight}×${h.deadlift_reps}`;
-        }
         return (
           <View key={h.id} style={styles.entry}>
             <Text style={styles.date}>
@@ -269,7 +200,6 @@ export default function WorkoutTab() {
                 {dur} min · {h.set_count} sets
               </Text>
             </View>
-            {note && <Text style={styles.note}>{note}</Text>}
           </View>
         );
       })}
