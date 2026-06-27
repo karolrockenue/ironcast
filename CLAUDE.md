@@ -746,12 +746,16 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 
 ## 17. Next session — pick up here
 
-**1.06 (2026-06-27) — 3-way split + drop pill + plank + regression hint.**
-COMMITTED locally as `b4159ab`, `app.json` version → **1.06**, schema **v12**.
-NOT yet pushed / built / submitted (the session that wrote it had no network).
-Run from a networked shell: `git push origin main` →
-`npx eas-cli@latest build --platform ios --profile production` →
-`npx eas-cli@latest submit --platform ios --latest` → ASC manual steps (§15).
+**1.06 (build 19) — BUILT + SUBMITTED 2026-06-27.** 3-way split + drop pill +
+plank + regression hint. Committed `4bf722f`, pushed to `origin/main`, schema
+**v12**, `app.json` version **1.06**. EAS build succeeded (build 19); EAS submit
+CLI showed a generic "Something went wrong" but the binary reached App Store
+Connect and processed (confirmed visible in ASC) — the CLI error was a
+post-upload polling hiccup, not a real failure. **Remaining manual ASC steps:**
++ Version or Platform → **1.06** → "What's New" → attach the processed **build
+19** → Add for Review (manual release). Export-compliance auto-resolves on
+attach. Known minor: Progress-tab "Current Weights" still shows Plank as `0 kg`
+(not time-formatted there).
 - **A/B → A/B/C split.** Three plans titled by muscle (Chest & Quads / Back &
   Hamstrings / Shoulders & Arms). Additive migration (rename A/B in place,
   rebuild contents, add C, add `template_exercises.sets` + `is_drop_set`). 3-way
