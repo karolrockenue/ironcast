@@ -16,6 +16,12 @@ function fmtVol(kg: number) {
   return `${Math.round(kg)}kg`;
 }
 
+// M:SS for time-based exercises (Plank stores held seconds in best_reps).
+function fmtSecs(s: number) {
+  const m = Math.floor(s / 60);
+  return `${m}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
 function prLabel(pr: PR) {
   if (pr.kind === "weight")
     return {
@@ -168,8 +174,10 @@ export default function Summary() {
         <View key={i} style={s.exRow}>
           <Text style={s.exName}>{ex.name}</Text>
           <Text style={s.exDetail}>
-            {ex.sets} set{ex.sets !== 1 ? "s" : ""} {"\u00B7"} best {ex.best_weight}
-            kg {"\u00D7"} {ex.best_reps}
+            {ex.sets} set{ex.sets !== 1 ? "s" : ""} {"\u00B7"} best{" "}
+            {ex.special_rules === "timed"
+              ? fmtSecs(ex.best_reps)
+              : `${ex.best_weight}kg \u00D7 ${ex.best_reps}`}
             {ex.drops > 0
               ? ` \u00B7 +${ex.drops} drop${ex.drops !== 1 ? "s" : ""}`
               : ""}

@@ -18,6 +18,8 @@ import {
   moveTemplateExercise,
   updateTemplateName,
   updateExercisePrescription,
+  updateTemplateExerciseSets,
+  updateTemplateExerciseDropSet,
   PrescribedExercise,
 } from "../../src/db/queries";
 import { workoutStore } from "../../src/store/workout";
@@ -45,6 +47,7 @@ export default function TemplateEditor() {
   const [eRepMin, setERepMin] = useState(5);
   const [eRepMax, setERepMax] = useState(8);
   const [eRest, setERest] = useState(120);
+  const [eDrop, setEDrop] = useState(false);
 
   const reload = useCallback(async () => {
     const rows = await getPrescribedExercises(db, templateId);
@@ -117,12 +120,17 @@ export default function TemplateEditor() {
     setERepMin(pe.default_rep_min);
     setERepMax(pe.default_rep_max);
     setERest(pe.default_rest_seconds);
+    setEDrop(!!pe.is_drop_set);
   };
 
   const saveEdit = async () => {
     if (!editing) return;
     const repMin = Math.max(1, eRepMin);
     const repMax = Math.max(repMin, eRepMax);
+    // Set count + drop flag are per-plan (template_exercises); rep range + rest
+    // live on the shared exercise row and apply everywhere it's used.
+    await updateTemplateExerciseSets(db, editing.id, Math.max(1, eSets));
+    await updateTemplateExerciseDropSet(db, editing.id, eDrop);
     await updateExercisePrescription(db, editing.exercise_id, {
       default_sets: Math.max(1, eSets),
       default_rep_min: repMin,
@@ -172,7 +180,12 @@ export default function TemplateEditor() {
               <View style={styles.exerciseInfo}>
                 <Text style={styles.indexNum}>{index + 1}.</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.exerciseName}>{item.exercise_name}</Text>
+                  <View style={styles.nameTagRow}>
+                    <Text style={styles.exerciseName}>{item.exercise_name}</Text>
+                    {item.is_drop_set ? (
+                      <Text style={styles.dropTag}>DROP SET</Text>
+                    ) : null}
+                  </View>
                   <Pressable
                     style={styles.prescriptionBtn}
                     onPress={() => openEdit(item)}
@@ -236,7 +249,8 @@ export default function TemplateEditor() {
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <Text style={styles.modalTitle}>{editing?.exercise_name}</Text>
             <Text style={styles.modalSub}>
-              Applies to every plan using this exercise
+              Sets & drop-set flag apply to this plan · reps & rest apply
+              everywhere this exercise is used
             </Text>
 
             <View style={styles.field}>
@@ -276,6 +290,23 @@ export default function TemplateEditor() {
                 onChange={setERest}
                 format={fmtRest}
               />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>DROP SET</Text>
+              <Pressable
+                style={[styles.dropToggle, eDrop && styles.dropToggleOn]}
+                onPress={() => setEDrop((v) => !v)}
+              >
+                <Text
+                  style={[
+                    styles.dropToggleText,
+                    eDrop && styles.dropToggleTextOn,
+                  ]}
+                >
+                  {eDrop ? "ON" : "OFF"}
+                </Text>
+              </Pressable>
             </View>
 
             <View style={styles.modalActions}>
@@ -368,7 +399,19 @@ const styles = StyleSheet.create({
     marginTop: 1,
     minWidth: 22,
   },
+  nameTagRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   exerciseName: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  dropTag: {
+    color: colors.warning,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1,
+    backgroundColor: "rgba(255,167,38,0.18)",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
   prescriptionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -465,6 +508,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontStyle: "italic",
   },
+  dropToggle: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  dropToggleOn: {
+    backgroundColor: "rgba(255,167,38,0.18)",
+    borderColor: "rgba(255,167,38,0.45)",
+  },
+  dropToggleText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  dropToggleTextOn: { color: colors.warning },
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   repDash: { color: colors.textSecondary, fontSize: 16, fontWeight: "700" },
   stepper: {

@@ -37,6 +37,12 @@ function formatDuration(start: string, end: string | null) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
+// M:SS for time-based exercises (Plank stores held seconds in the reps column).
+function fmtSecs(s: number) {
+  const m = Math.floor(s / 60);
+  return `${m}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
 export default function HistoryTab() {
   const db = useDB();
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
@@ -121,7 +127,9 @@ export default function HistoryTab() {
                         ) : null}
                       </Text>
                       <Text style={styles.detailSet}>
-                        {s.weight} kg {"\u00D7"} {s.reps}
+                        {s.exercise_special_rules === "timed"
+                          ? fmtSecs(s.reps)
+                          : `${s.weight} kg \u00D7 ${s.reps}`}
                       </Text>
                     </View>
                     {drops && drops.length > 0 && (
@@ -175,7 +183,7 @@ const styles = StyleSheet.create({
   detailExercise: { color: colors.text, fontSize: 14 },
   detailSet: { color: colors.textSecondary, fontSize: 14 },
   dropBadge: {
-    color: colors.accent,
+    color: colors.warning,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,

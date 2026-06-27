@@ -23,7 +23,15 @@ import * as SQLite from "expo-sqlite";
 // v11: deadlift heavy/technique alternation removed — clear the 'deadlift_ht'
 //     special rule so Deadlift progresses like any other exercise. The
 //     workouts.deadlift_mode column stays as read-only history.
-const SCHEMA_VERSION = 11;
+// v12: A/B → A/B/C 3-way split. Templates renamed by dominant muscle
+//     ("Chest & Quads" / "Back & Hamstrings" / "Shoulders & Arms") and their
+//     contents replaced; a third template is added. ADDITIVE for live installs:
+//     template_exercises gains `sets` (per-plan set count, since the same
+//     exercise can be 2 sets in one plan and 3 in another) and `is_drop_set`
+//     (drives the yellow DROP SET pill — a reminder, not logged). Plank added
+//     as the first time-based exercise (special_rules='timed', seconds stored
+//     in the reps column). No workout/set data is dropped.
+const SCHEMA_VERSION = 12;
 
 type ExerciseSeed = {
   name: string;
@@ -42,28 +50,33 @@ type ExerciseSeed = {
   is_per_arm: boolean; // cosmetic only — user logs 2 sets, does both arms
 };
 
-// ─── The single source of truth for the seeded plans ───────
+// ─── Plan exercise definitions (the exercise ROWS) ───────
+// These define the exercise rows for the movements used by the seeded plans;
+// the plan structure itself (which exercise, how many sets, drop flag) lives in
+// PLANS below. Kept as two arrays for historical continuity (WORKOUT_A also
+// holds legacy rows like Incline Bench DB / Hanging Leg Raises that the seed
+// history references but the new 3-way plans no longer use).
 // Exercise names here are exactly what the app shows.
 // weight_increment is aligned with min_increment_kg: the progression bump
 // should match what the equipment actually allows. This also matches the
 // user's real gym (Lat Pulldown / Seated Row stacks step by 5 kg).
 const WORKOUT_A: ExerciseSeed[] = [
-  { name: "Hack Squat (Machine)",              category: "legs",  movement_type: "Compound",  muscle_group: "Quads",     default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 180, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Bench Press (Smith Machine)",       category: "push",  movement_type: "Compound",  muscle_group: "Chest",     default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Hack Squat (Machine)",              category: "legs",  movement_type: "Compound",  muscle_group: "Quads",     default_sets: 3, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 180, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Bench Press (Smith Machine)",       category: "push",  movement_type: "Compound",  muscle_group: "Chest",     default_sets: 3, default_rep_min: 6,  default_rep_max: 9,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Incline Bench Press (Dumbbell)",    category: "push",  movement_type: "Compound",  muscle_group: "Chest",     default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 150, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Leg Extension (Machine)",           category: "legs",  movement_type: "Isolation", muscle_group: "Quads",     default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 90,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Single Arm Cable Tricep Pushdown",  category: "push",  movement_type: "Isolation", muscle_group: "Triceps",   default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 75,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
-  { name: "Single Arm Lateral Raise (Cable)",  category: "push",  movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
+  { name: "Single Arm Lateral Raise (Cable)",  category: "push",  movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 12, default_rest_seconds: 60,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
   { name: "Hanging Leg Raises",                category: "core",  movement_type: "Isolation", muscle_group: "Core",      default_sets: 2, default_rep_min: 8,  default_rep_max: 15, default_rest_seconds: 75,  weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
 ];
 
 const WORKOUT_B: ExerciseSeed[] = [
   { name: "Deadlift (Barbell)",                category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 3,  default_rep_max: 5,  default_rest_seconds: 180, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Shoulder Press (Machine Plates)",   category: "push",  movement_type: "Compound",  muscle_group: "Shoulders", default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Lat Pulldown (Cable)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 5,  default_rep_max: 8,  default_rest_seconds: 150, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.80, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Seated Row (Machine)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 120, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Bicep Curl (Dumbbell)",             category: "pull",  movement_type: "Isolation", muscle_group: "Biceps",    default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 75,  weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
-  { name: "Single Arm Lateral Raise (Cable)",  category: "push",  movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
+  { name: "Shoulder Press (Machine Plates)",   category: "push",  movement_type: "Compound",  muscle_group: "Shoulders", default_sets: 3, default_rep_min: 6,  default_rep_max: 9,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Lat Pulldown (Cable)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 3, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 150, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.80, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Seated Row (Machine)",              category: "pull",  movement_type: "Compound",  muscle_group: "Back",      default_sets: 3, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 120, weight_increment: 5,   min_increment_kg: 5,   back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Bicep Curl (Dumbbell)",             category: "pull",  movement_type: "Isolation", muscle_group: "Biceps",    default_sets: 3, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 75,  weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
+  { name: "Single Arm Lateral Raise (Cable)",  category: "push",  movement_type: "Isolation", muscle_group: "Shoulders", default_sets: 2, default_rep_min: 10, default_rep_max: 12, default_rest_seconds: 60,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
   { name: "Hanging Leg Raises",                category: "core",  movement_type: "Isolation", muscle_group: "Core",      default_sets: 2, default_rep_min: 8,  default_rep_max: 15, default_rest_seconds: 75,  weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
 ];
 
@@ -83,7 +96,12 @@ const CATALOG: ExerciseSeed[] = [
   { name: "Decline Bench Press (Barbell)",      category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Decline Bench Press (Dumbbell)",     category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 150, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Chest Press (Machine)",              category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 120, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
-  { name: "Incline Chest Press (Machine)",      category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 2, default_rep_min: 6,  default_rep_max: 10, default_rest_seconds: 120, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  // Flat Bench (Machine) added in v12. Note: the seeded "Chest & Quads" plan's
+  // flat-bench slot deliberately uses the existing "Bench Press (Smith Machine)"
+  // row (it carries the user's logged history) — this row is the standalone
+  // machine-bench option for custom templates.
+  { name: "Flat Bench (Machine)",               category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 3, default_rep_min: 6,  default_rep_max: 9,  default_rest_seconds: 150, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Incline Chest Press (Machine)",      category: "push", movement_type: "Compound",  muscle_group: "Chest", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 120, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Dumbbell Fly (Flat)",                category: "push", movement_type: "Isolation", muscle_group: "Chest", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 90,  weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Dumbbell Fly (Incline)",             category: "push", movement_type: "Isolation", muscle_group: "Chest", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 90,  weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Cable Fly (Mid)",                    category: "push", movement_type: "Isolation", muscle_group: "Chest", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
@@ -176,7 +194,7 @@ const CATALOG: ExerciseSeed[] = [
   { name: "Skullcrusher (EZ-Bar)",              category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 90,  weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Skullcrusher (Dumbbell)",            category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 90,  weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
   { name: "Overhead Tricep Extension (Dumbbell)", category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
-  { name: "Overhead Tricep Extension (Cable Rope)", category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
+  { name: "Overhead Tricep Extension (Cable Rope)", category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 8,  default_rep_max: 12, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Overhead Tricep Extension (EZ-Bar)", category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Tricep Pushdown (Cable Bar)",        category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Tricep Pushdown (Cable Rope)",       category: "push", movement_type: "Isolation", muscle_group: "Triceps", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 75, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
@@ -240,7 +258,12 @@ const CATALOG: ExerciseSeed[] = [
   { name: "Decline Sit-Up",                     category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
   { name: "Russian Twist (Dumbbell)",           category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 20, default_rest_seconds: 60, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Woodchopper (Cable)",                category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
-  { name: "Pallof Press (Cable)",               category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
+  { name: "Pallof Press (Cable)",               category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 12, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
+  { name: "Side Bend (Dumbbell or Cable)",      category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 2.5, min_increment_kg: 2.5, back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: true,  special_rules: null },
+  // Plank — first time-based exercise. special_rules 'timed': the active screen
+  // shows a count-up timer and stores the held duration (seconds) in the reps
+  // column; weight is 0. Progression aims for more seconds.
+  { name: "Plank",                              category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 30, default_rep_max: 60, default_rest_seconds: 60, weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "timed" },
   { name: "Dragon Flag",                        category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 5,  default_rep_max: 10, default_rest_seconds: 120, weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
   { name: "Ab Wheel Rollout",                   category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 5,  default_rep_max: 15, default_rest_seconds: 90,  weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
   { name: "Oblique Crunch",                     category: "core", movement_type: "Isolation", muscle_group: "Core", default_sets: 2, default_rep_min: 10, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 0,   min_increment_kg: 0,   back_off_ratio: 1.00, weight_display_mode: "total",    is_per_arm: false, special_rules: "reps_only" },
@@ -251,6 +274,76 @@ const CATALOG: ExerciseSeed[] = [
   { name: "Reverse Wrist Curl (Barbell)",       category: "pull", movement_type: "Isolation", muscle_group: "Forearms", default_sets: 2, default_rep_min: 12, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "total",    is_per_arm: false, special_rules: null },
   { name: "Reverse Wrist Curl (Dumbbell)",      category: "pull", movement_type: "Isolation", muscle_group: "Forearms", default_sets: 2, default_rep_min: 12, default_rep_max: 15, default_rest_seconds: 60, weight_increment: 1,   min_increment_kg: 1,   back_off_ratio: 0.90, weight_display_mode: "per_hand", is_per_arm: false, special_rules: null },
 ];
+
+// ─── The 3-way split (v12) ───────────────────────────────────
+// Templates are titled by dominant muscle. Each entry references an exercise by
+// name (defined in WORKOUT_A/WORKOUT_B/CATALOG above) plus per-plan overrides:
+//   sets        — working-set count for THIS plan (the same exercise can be 2
+//                 sets in one plan and 3 in another)
+//   is_drop_set — show the yellow DROP SET pill on the last working set
+// NB: "Chest & Quads" intentionally uses "Bench Press (Smith Machine)" for its
+// flat-bench slot because that row carries the user's logged history.
+type PlanItem = { name: string; sets: number; is_drop_set?: boolean };
+type Plan = { name: string; items: PlanItem[] };
+
+const PLANS: Plan[] = [
+  {
+    name: "Chest & Quads",
+    items: [
+      { name: "Hack Squat (Machine)", sets: 3 },
+      { name: "Leg Extension (Machine)", sets: 2, is_drop_set: true },
+      { name: "Bench Press (Smith Machine)", sets: 3 },
+      { name: "Incline Chest Press (Machine)", sets: 2 },
+      { name: "Single Arm Cable Tricep Pushdown", sets: 2, is_drop_set: true },
+      { name: "Single Arm Lateral Raise (Cable)", sets: 2, is_drop_set: true },
+      { name: "Cable Crunch", sets: 2 },
+      { name: "Pallof Press (Cable)", sets: 2 },
+    ],
+  },
+  {
+    name: "Back & Hamstrings",
+    items: [
+      { name: "Deadlift (Barbell)", sets: 2 },
+      { name: "Glute Bridge (Barbell)", sets: 3 },
+      { name: "Leg Curl (Seated Machine)", sets: 3, is_drop_set: true },
+      { name: "Lat Pulldown (Cable)", sets: 3 },
+      { name: "Seated Row (Machine)", sets: 3 },
+      { name: "Bicep Curl (Dumbbell)", sets: 3, is_drop_set: true },
+      { name: "Side Bend (Dumbbell or Cable)", sets: 2 },
+      { name: "Cable Crunch", sets: 2 },
+      { name: "Plank", sets: 2 },
+    ],
+  },
+  {
+    name: "Shoulders & Arms",
+    items: [
+      { name: "Shoulder Press (Machine Plates)", sets: 3 },
+      { name: "Incline Chest Press (Machine)", sets: 2 },
+      { name: "Single Arm Lateral Raise (Cable)", sets: 3, is_drop_set: true },
+      { name: "Overhead Tricep Extension (Cable Rope)", sets: 2, is_drop_set: true },
+      { name: "Bicep Curl (Dumbbell)", sets: 2, is_drop_set: true },
+      { name: "Back Extension", sets: 2 },
+      { name: "Side Bend (Dumbbell or Cable)", sets: 2 },
+      { name: "Cable Crunch", sets: 2 },
+      { name: "Pallof Press (Cable)", sets: 2 },
+    ],
+  },
+];
+
+// Ordered plan names — the rotation cycle and the A/B/C letters derive from
+// this. Kept in sync with PLANS; also exported for the rotation engine.
+export const PLAN_NAMES = PLANS.map((p) => p.name);
+
+// Merged exercise library, de-duped by name (plans/WORKOUT win over CATALOG so
+// the user-specific rep ranges survive). Single source of truth for both the
+// fresh-install seed and the live-install upsert.
+function mergedExerciseSeeds(): Map<string, ExerciseSeed> {
+  const byName = new Map<string, ExerciseSeed>();
+  for (const e of [...WORKOUT_A, ...WORKOUT_B, ...CATALOG]) {
+    if (!byName.has(e.name)) byName.set(e.name, e);
+  }
+  return byName;
+}
 
 export async function initDB(db: SQLite.SQLiteDatabase) {
   const { user_version: current = 0 } =
@@ -311,6 +404,111 @@ async function migrateForward(db: SQLite.SQLiteDatabase, from: number) {
       "UPDATE exercises SET special_rules = NULL WHERE special_rules = 'deadlift_ht'"
     );
   }
+  if (from < 12) {
+    // v12: A/B → A/B/C split. ADDITIVE — workouts and sets are never touched.
+    // template_exercises holds plan structure only, so rebuilding it preserves
+    // all logged history; progression reads last Set 1 by exercise_id, so the
+    // carried exercises keep continuity automatically.
+
+    // 1. Per-plan columns on template_exercises (createSchema's IF NOT EXISTS
+    //    won't alter an existing table, so add them explicitly).
+    await addColumnIfMissing(db, "template_exercises", "sets", "INTEGER");
+    await addColumnIfMissing(
+      db,
+      "template_exercises",
+      "is_drop_set",
+      "INTEGER NOT NULL DEFAULT 0"
+    );
+
+    // 2. Ensure every exercise the new plans need exists, and refresh the
+    //    prescription fields of carried exercises to the new plan values.
+    //    default_sets is intentionally left untouched (per-plan set count now
+    //    lives in template_exercises.sets).
+    const seeds = mergedExerciseSeeds();
+    const neededNames = new Set([
+      ...PLANS.flatMap((p) => p.items.map((i) => i.name)),
+      "Flat Bench (Machine)", // standalone catalog addition (not in any plan)
+    ]);
+    for (const name of neededNames) {
+      const e = seeds.get(name);
+      if (!e) continue;
+      await db.runAsync(
+        `INSERT OR IGNORE INTO exercises
+          (name, category, movement_type, muscle_group, default_sets,
+           default_rep_min, default_rep_max, default_rest_seconds,
+           weight_increment, min_increment_kg, back_off_ratio,
+           weight_display_mode, is_per_arm, special_rules)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          e.name, e.category, e.movement_type, e.muscle_group, e.default_sets,
+          e.default_rep_min, e.default_rep_max, e.default_rest_seconds,
+          e.weight_increment, e.min_increment_kg, e.back_off_ratio,
+          e.weight_display_mode, e.is_per_arm ? 1 : 0, e.special_rules,
+        ]
+      );
+      await db.runAsync(
+        `UPDATE exercises SET
+           default_rep_min = ?, default_rep_max = ?, default_rest_seconds = ?,
+           weight_increment = ?, min_increment_kg = ?, back_off_ratio = ?,
+           weight_display_mode = ?, is_per_arm = ?, special_rules = ?
+         WHERE name = ?`,
+        [
+          e.default_rep_min, e.default_rep_max, e.default_rest_seconds,
+          e.weight_increment, e.min_increment_kg, e.back_off_ratio,
+          e.weight_display_mode, e.is_per_arm ? 1 : 0, e.special_rules, e.name,
+        ]
+      );
+    }
+
+    // 3. Rename the two old templates in place (keeps template_id, so finished
+    //    workouts keep their linkage), then rebuild all three plans' contents.
+    await db.runAsync("UPDATE templates SET name = ? WHERE name = ?", [
+      "Chest & Quads",
+      "Workout A",
+    ]);
+    await db.runAsync("UPDATE templates SET name = ? WHERE name = ?", [
+      "Back & Hamstrings",
+      "Workout B",
+    ]);
+
+    const exRows = await db.getAllAsync<{ id: number; name: string }>(
+      "SELECT id, name FROM exercises"
+    );
+    const idsByName = new Map(exRows.map((r) => [r.name, r.id]));
+
+    for (const plan of PLANS) {
+      let t = await db.getFirstAsync<{ id: number }>(
+        "SELECT id FROM templates WHERE name = ?",
+        [plan.name]
+      );
+      if (!t) {
+        const r = await db.runAsync("INSERT INTO templates (name) VALUES (?)", [
+          plan.name,
+        ]);
+        t = { id: r.lastInsertRowId };
+      }
+      await db.runAsync(
+        "DELETE FROM template_exercises WHERE template_id = ?",
+        [t.id]
+      );
+      await seedTemplateItems(db, t.id, plan.items, idsByName);
+    }
+  }
+}
+
+// Add a column only if it doesn't already exist (SQLite ALTER TABLE ADD COLUMN
+// throws on a duplicate). Used by additive migrations.
+async function addColumnIfMissing(
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+  decl: string
+) {
+  const cols = await db.getAllAsync<{ name: string }>(
+    `PRAGMA table_info(${table})`
+  );
+  if (cols.some((c) => c.name === column)) return;
+  await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
 }
 
 async function createSchema(db: SQLite.SQLiteDatabase) {
@@ -365,6 +563,12 @@ async function createSchema(db: SQLite.SQLiteDatabase) {
       template_id INTEGER NOT NULL,
       exercise_id INTEGER NOT NULL,
       sort_order INTEGER NOT NULL,
+      -- Per-plan overrides (v12). 'sets' is the working-set count for THIS plan
+      -- (NULL falls back to exercises.default_sets); the same exercise can be
+      -- 2 sets in one plan and 3 in another. 'is_drop_set' flags the exercise
+      -- to show the yellow DROP SET pill (a reminder; drops are not logged).
+      sets INTEGER,
+      is_drop_set INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE,
       FOREIGN KEY (exercise_id) REFERENCES exercises(id)
     );
@@ -399,13 +603,7 @@ async function createSchema(db: SQLite.SQLiteDatabase) {
 }
 
 async function seedExercisesAndPlans(db: SQLite.SQLiteDatabase) {
-  // Merge the plans + broader catalog into a de-duped set by name. Plans win
-  // on collision so user-specific rep ranges (e.g. Bench Press 5–8) survive
-  // when a similarly-named exercise also appears in the catalog.
-  const byName = new Map<string, ExerciseSeed>();
-  for (const e of [...WORKOUT_A, ...WORKOUT_B, ...CATALOG]) {
-    if (!byName.has(e.name)) byName.set(e.name, e);
-  }
+  const byName = mergedExerciseSeeds();
 
   const idsByName = new Map<string, number>();
   for (const e of byName.values()) {
@@ -428,23 +626,32 @@ async function seedExercisesAndPlans(db: SQLite.SQLiteDatabase) {
     idsByName.set(e.name, r.lastInsertRowId);
   }
 
-  const seedPlan = async (templateName: string, exercises: ExerciseSeed[]) => {
-    const t = await db.runAsync(
-      "INSERT INTO templates (name) VALUES (?)",
-      [templateName]
-    );
-    for (let i = 0; i < exercises.length; i++) {
-      const exId = idsByName.get(exercises[i].name);
-      if (exId === undefined) continue;
-      await db.runAsync(
-        "INSERT INTO template_exercises (template_id, exercise_id, sort_order) VALUES (?, ?, ?)",
-        [t.lastInsertRowId, exId, i]
-      );
-    }
-  };
+  for (const plan of PLANS) {
+    const t = await db.runAsync("INSERT INTO templates (name) VALUES (?)", [
+      plan.name,
+    ]);
+    await seedTemplateItems(db, t.lastInsertRowId, plan.items, idsByName);
+  }
+}
 
-  await seedPlan("Workout A", WORKOUT_A);
-  await seedPlan("Workout B", WORKOUT_B);
+// Insert a plan's exercises into template_exercises with per-plan sets + drop
+// flag. Shared by the fresh-install seed and the live-install v12 migration.
+async function seedTemplateItems(
+  db: SQLite.SQLiteDatabase,
+  templateId: number,
+  items: PlanItem[],
+  idsByName: Map<string, number>
+) {
+  for (let i = 0; i < items.length; i++) {
+    const exId = idsByName.get(items[i].name);
+    if (exId === undefined) continue;
+    await db.runAsync(
+      `INSERT INTO template_exercises
+         (template_id, exercise_id, sort_order, sets, is_drop_set)
+       VALUES (?, ?, ?, ?, ?)`,
+      [templateId, exId, i, items[i].sets, items[i].is_drop_set ? 1 : 0]
+    );
+  }
 }
 
 // ─── Historical session seed ────────────────────────────────
@@ -461,7 +668,7 @@ async function seedExercisesAndPlans(db: SQLite.SQLiteDatabase) {
 type HistoricalSession = {
   date: string;            // "YYYY-MM-DD HH:MM:SS" (UTC)
   duration_min: number;
-  plan: "Workout A" | "Workout B";
+  plan: "Chest & Quads" | "Back & Hamstrings";
   deadlift_mode?: "heavy" | "technique";
   sets: { exercise: string; weight: number; reps: number }[];
 };
@@ -470,7 +677,7 @@ const HISTORY: HistoricalSession[] = [
   {
     date: "2026-04-18 18:00:00",
     duration_min: 49,
-    plan: "Workout A",
+    plan: "Chest & Quads",
     sets: [
       { exercise: "Hack Squat (Machine)",              weight: 15,   reps: 7 },
       { exercise: "Hack Squat (Machine)",              weight: 15,   reps: 6 },
@@ -497,7 +704,7 @@ const HISTORY: HistoricalSession[] = [
   {
     date: "2026-04-15 18:00:00",
     duration_min: 48,
-    plan: "Workout B",
+    plan: "Back & Hamstrings",
     deadlift_mode: "heavy",
     sets: [
       { exercise: "Deadlift (Barbell)",                weight: 95,   reps: 4 },

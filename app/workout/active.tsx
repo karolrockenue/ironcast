@@ -31,13 +31,11 @@ import {
   removeExerciseFromTemplate,
   decideProgression,
   detectPRsForSet1,
-  addDrop,
-  deleteDrop,
-  getDropsForWorkout,
+  getRegressionHint,
   SetRow,
-  DropRow,
   PrescribedExercise,
   LastSet,
+  RegressionHint,
   PRKind,
 } from "../../src/db/queries";
 import { useRestTimer } from "../../src/store/restTimer";
@@ -422,19 +420,11 @@ const em = StyleSheet.create({
 function DoneCard({
   ex,
   logged,
-  dropsBySet,
-  onAddDrop,
-  onDeleteDrop,
-  onBeginDrop,
 }: {
   ex: PrescribedExercise;
   logged: SetRow[];
-  dropsBySet: Map<number, DropRow[]>;
-  onAddDrop: (setId: number, dropSeq: number, weight: number, reps: number) => void;
-  onDeleteDrop: (dropId: number) => void;
-  onBeginDrop: () => void;
 }) {
-  const lastSet = logged[logged.length - 1] ?? null;
+  const timed = ex.special_rules === "timed";
   const chips = logged.map((s) => {
     const state =
       s.reps >= ex.default_rep_max
@@ -456,7 +446,9 @@ function DoneCard({
         : colors.warning;
     return (
       <View key={s.id} style={[c.chip, { backgroundColor: bg }]}>
-        <Text style={[c.chipText, { color: fg }]}>{s.reps}</Text>
+        <Text style={[c.chipText, { color: fg }]}>
+          {timed ? fmtSecs(s.reps) : s.reps}
+        </Text>
       </View>
     );
   });
@@ -473,24 +465,19 @@ function DoneCard({
             </Text>
           </View>
           <Text style={c.sub}>
-            {logged.length} sets · {logged[0]?.weight ?? "?"} kg
+            {timed
+              ? `${logged.length} sets · best ${fmtSecs(
+                  Math.max(...logged.map((l) => l.reps))
+                )}`
+              : `${logged.length} sets · ${logged[0]?.weight ?? "?"} kg`}
           </Text>
         </View>
+        {ex.is_drop_set ? <DropSetPill /> : null}
         <View style={[c.pill, c.pillDone]}>
           <Text style={[c.pillText, c.pillDoneText]}>DONE</Text>
         </View>
       </View>
       <View style={c.chips}>{chips}</View>
-      {lastSet && (
-        <DropLadder
-          setRow={lastSet}
-          drops={dropsBySet.get(lastSet.id) ?? []}
-          increment={ex.min_increment_kg}
-          onBegin={onBeginDrop}
-          onAdd={(seq, w, r) => onAddDrop(lastSet.id, seq, w, r)}
-          onDelete={onDeleteDrop}
-        />
-      )}
     </View>
   );
 }
@@ -507,6 +494,8 @@ function PendingCard({
   onSkip: () => void;
 }) {
   const partial = loggedCount > 0;
+  const timed = ex.special_rules === "timed";
+  const range = `${ex.default_rep_min}–${ex.default_rep_max}${timed ? "s" : ""}`;
   return (
     <Pressable
       style={[c.card, c.cardPending]}
@@ -522,13 +511,12 @@ function PendingCard({
           <Text style={c.sub}>
             {partial
               ? `${loggedCount}/${ex.default_sets} sets done · resume`
-              : `${ex.default_sets} sets · target ${ex.default_rep_min}–${ex.default_rep_max}`}
+              : `${ex.default_sets} sets · target ${range}`}
           </Text>
         </View>
+        {ex.is_drop_set ? <DropSetPill /> : null}
         <View style={[c.pill, c.pillPending]}>
-          <Text style={[c.pillText, c.pillPendingText]}>
-            {ex.default_rep_min}–{ex.default_rep_max}
-          </Text>
+          <Text style={[c.pillText, c.pillPendingText]}>{range}</Text>
         </View>
       </View>
     </Pressable>
@@ -559,106 +547,59 @@ function SkippedCard({
   );
 }
 
-// Drop-set ladder hung off a single (logged) set. Renders existing burnout
-// stages and a one-at-a-time inline editor for adding the next one. Each new
-// stage auto-fills at 75% of the stage above (rounded to the increment); reps
-// are typed. Opening the editor cancels any running rest (no rest between
-// drops); logging the stage restarts it — handled by the parent via onBegin /
-// onAdd.
-function DropLadder({
-  setRow,
-  drops,
-  increment,
-  onBegin,
-  onAdd,
-  onDelete,
-}: {
-  setRow: SetRow;
-  drops: DropRow[];
-  increment: number;
-  onBegin: () => void;
-  onAdd: (dropSeq: number, weight: number, reps: number) => void;
-  onDelete: (dropId: number) => void;
-}) {
-  const [pending, setPending] = useState<{ kg: number; reps: number | null } | null>(
-    null
+// Yellow DROP SET pill. A reminder that the last working set of this exercise
+// is a drop set (do it on the floor) — drops are no longer logged in-app, so
+// this is purely a cue. Driven by template_exercises.is_drop_set.
+function DropSetPill() {
+  return (
+    <View style={[c.pill, c.pillDrop]}>
+      <Text style={[c.pillText, c.pillDropText]}>DROP SET</Text>
+    </View>
   );
-  const prev = drops.length
-    ? drops[drops.length - 1]
-    : { weight: setRow.weight, reps: setRow.reps };
-  const nextSeq = drops.length
-    ? Math.max(...drops.map((d) => d.drop_seq)) + 1
-    : 1;
+}
 
-  const begin = () => {
-    onBegin();
-    setPending({ kg: roundToIncrement(prev.weight * 0.75, increment), reps: null });
-  };
-  const confirm = () => {
-    if (pending && pending.reps != null && pending.reps > 0) {
-      onAdd(nextSeq, pending.kg, pending.reps);
-      setPending(null);
-    }
-  };
+// Format seconds as M:SS for time-based exercises (Plank).
+function fmtSecs(s: number) {
+  return fmt(s);
+}
+
+// Count-up timer for a time-based exercise (Plank). START begins the hold;
+// STOP & LOG records the elapsed seconds (stored in the reps column, weight 0).
+function PlankTimer({ onLog }: { onLog: (secs: number) => void }) {
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const t0 = Date.now() - elapsed * 1000;
+    const i = setInterval(
+      () => setElapsed(Math.round((Date.now() - t0) / 1000)),
+      250
+    );
+    return () => clearInterval(i);
+  }, [running]);
 
   return (
-    <View style={c.dropWrap}>
-      {drops.map((d) => (
-        <View key={d.id} style={c.dropRow}>
-          <Text style={c.dropTag}>↳</Text>
-          <View style={c.dropCellKg}>
-            <Text style={c.dropVal}>{d.weight} kg</Text>
-          </View>
-          <View style={c.dropCellReps}>
-            <Text style={c.dropVal}>{d.reps}</Text>
-          </View>
-          <Pressable style={c.dropDelBtn} onPress={() => onDelete(d.id)} hitSlop={8}>
-            <Text style={c.dropDelText}>{"×"}</Text>
-          </Pressable>
-        </View>
-      ))}
-
-      {pending ? (
-        <>
-          <View style={c.dropRow}>
-            <Text style={c.dropTag}>↳</Text>
-            <NumericStepper
-              value={pending.kg}
-              step={increment}
-              unit="kg"
-              style={{ width: 96 }}
-              onChange={(n) =>
-                setPending((p) => (p ? { ...p, kg: n ?? 0 } : p))
-              }
-            />
-            <NumericStepper
-              value={pending.reps}
-              step={1}
-              allowEmpty
-              placeholder={String(prev.reps)}
-              style={{ flex: 1 }}
-              onChange={(n) => setPending((p) => (p ? { ...p, reps: n } : p))}
-            />
-            <LogButton
-              logged={false}
-              disabled={pending.reps == null || pending.reps <= 0}
-              onPress={confirm}
-            />
-            <Pressable
-              style={c.dropDelBtn}
-              onPress={() => setPending(null)}
-              hitSlop={8}
-            >
-              <Text style={c.dropDelText}>{"×"}</Text>
-            </Pressable>
-          </View>
-          <Text style={c.dropNoRest}>no rest — log this drop, then rest starts</Text>
-        </>
+    <View style={c.timerRow}>
+      <Text style={c.timerElapsed}>{fmtSecs(elapsed)}</Text>
+      {!running ? (
+        <Pressable
+          style={[c.timerBtn, c.timerStart]}
+          onPress={() => {
+            setRunning(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          }}
+        >
+          <Text style={c.timerStartText}>{elapsed > 0 ? "RESUME" : "START"}</Text>
+        </Pressable>
       ) : (
-        <Pressable style={c.dropAdd} onPress={begin} hitSlop={6}>
-          <Text style={c.dropAddText}>
-            {"⇊"} {drops.length ? "ADD DROP" : "DROP SET"}
-          </Text>
+        <Pressable
+          style={[c.timerBtn, c.timerStop]}
+          onPress={() => {
+            setRunning(false);
+            if (elapsed > 0) onLog(elapsed);
+          }}
+        >
+          <Text style={c.timerStopText}>STOP &amp; LOG</Text>
         </Pressable>
       )}
     </View>
@@ -670,28 +611,23 @@ function ActiveCard({
   logged,
   lastSet,
   lastSessionSets,
-  dropsBySet,
+  regression,
   onLogSet,
   onDeleteSet,
   onEditSet,
-  onAddDrop,
-  onDeleteDrop,
-  onBeginDrop,
   onSkip,
 }: {
   ex: PrescribedExercise;
   logged: SetRow[];
   lastSet: LastSet | null;
   lastSessionSets: Map<number, LastSet>;
-  dropsBySet: Map<number, DropRow[]>;
+  regression: RegressionHint | null;
   onLogSet: (setIdx: number, weight: number, reps: number) => void;
   onDeleteSet: (setId: number) => void;
   onEditSet: (row: SetRow) => void;
-  onAddDrop: (setId: number, dropSeq: number, weight: number, reps: number) => void;
-  onDeleteDrop: (dropId: number) => void;
-  onBeginDrop: () => void;
   onSkip: () => void;
 }) {
+  const timed = ex.special_rules === "timed";
   const suggested = suggestStartingWeight(ex, lastSet);
 
   // Per-set KG. Each row owns its own value: logged sets are locked to the
@@ -796,16 +732,33 @@ function ActiveCard({
           <Text style={c.sub}>
             {ex.default_sets} sets · last time{" "}
             {lastSet
-              ? `${lastSet.weight} kg × ${lastSet.reps}`
+              ? timed
+                ? fmtSecs(lastSet.reps)
+                : `${lastSet.weight} kg × ${lastSet.reps}`
               : "—"}
           </Text>
         </View>
+        {ex.is_drop_set ? <DropSetPill /> : null}
         <View style={c.pill}>
           <Text style={c.pillText}>
             {ex.default_rep_min}–{ex.default_rep_max}
+            {timed ? "s" : ""}
           </Text>
         </View>
       </Pressable>
+
+      {/* Regression hint — last session dropped below an earlier best, so the
+          aim is to get back to that weight (don't celebrate a recovered weight
+          as a fresh PR). */}
+      {regression && (
+        <View style={c.regress}>
+          <Text style={c.regressText}>
+            {"↩ last was "}
+            {regression.last_weight} kg — you hit {regression.prev_best_weight}{" "}
+            kg before. Aim to get back to it.
+          </Text>
+        </View>
+      )}
 
       {/* Coach line — only when nothing logged yet */}
       {logged.length === 0 && (
@@ -818,9 +771,15 @@ function ActiveCard({
       <View style={c.setsWrap}>
         <View style={c.colHeaders}>
           <Text style={c.colHeaderSet}>SET</Text>
-          <Text style={c.colHeaderKg}>WEIGHT</Text>
-          <Text style={c.colHeaderReps}>REPS</Text>
-          <View style={{ width: 52 }} />
+          {timed ? (
+            <Text style={[c.colHeaderReps, { textAlign: "left" }]}>TIME</Text>
+          ) : (
+            <>
+              <Text style={c.colHeaderKg}>WEIGHT</Text>
+              <Text style={c.colHeaderReps}>REPS</Text>
+              <View style={{ width: 52 }} />
+            </>
+          )}
         </View>
 
         {Array.from({ length: ex.default_sets }).map((_, idx) => {
@@ -857,84 +816,94 @@ function ActiveCard({
                 >
                   SET {idx + 1}
                 </Text>
-                <NumericStepper
-                  value={kg}
-                  step={ex.min_increment_kg}
-                  unit="kg"
-                  disabled={!!row}
-                  style={{ width: 108 }}
-                  onChange={(n) => {
-                    setKgPerSet((prev) => {
-                      const next = [...prev];
-                      next[idx] = n ?? 0;
-                      return next;
-                    });
-                    setKgUserEdited((prev) => {
-                      if (prev[idx]) return prev;
-                      const next = [...prev];
-                      next[idx] = true;
-                      return next;
-                    });
-                  }}
-                />
-                <NumericStepper
-                  value={displayedReps ?? null}
-                  step={1}
-                  placeholder={
-                    last?.reps != null ? String(last.reps) : "reps"
-                  }
-                  disabled={!!row}
-                  allowEmpty
-                  style={{ flex: 1 }}
-                  tint={
-                    row
-                      ? undefined
-                      : repsTint(
-                          pendingReps,
-                          ex.default_rep_min,
-                          ex.default_rep_max,
-                          last?.reps ?? null
-                        )
-                  }
-                  onChange={(n) => {
-                    setRepsPerSet((prev) => {
-                      const next = [...prev];
-                      next[idx] = n;
-                      return next;
-                    });
-                  }}
-                />
-                <LogButton
-                  logged={!!row}
-                  disabled={
-                    !row && (pendingReps == null || pendingReps <= 0)
-                  }
-                  onPress={() => {
-                    if (row) onDeleteSet(row.id);
-                    else commit();
-                  }}
-                />
+                {timed ? (
+                  row ? (
+                    <>
+                      <Text style={c.timerLogged}>{fmtSecs(row.reps)}</Text>
+                      <LogButton logged onPress={() => onDeleteSet(row.id)} />
+                    </>
+                  ) : (
+                    <PlankTimer onLog={(secs) => onLogSet(idx, 0, secs)} />
+                  )
+                ) : (
+                  <>
+                    <NumericStepper
+                      value={kg}
+                      step={ex.min_increment_kg}
+                      unit="kg"
+                      disabled={!!row}
+                      style={{ width: 108 }}
+                      onChange={(n) => {
+                        setKgPerSet((prev) => {
+                          const next = [...prev];
+                          next[idx] = n ?? 0;
+                          return next;
+                        });
+                        setKgUserEdited((prev) => {
+                          if (prev[idx]) return prev;
+                          const next = [...prev];
+                          next[idx] = true;
+                          return next;
+                        });
+                      }}
+                    />
+                    <NumericStepper
+                      value={displayedReps ?? null}
+                      step={1}
+                      placeholder={
+                        last?.reps != null ? String(last.reps) : "reps"
+                      }
+                      disabled={!!row}
+                      allowEmpty
+                      style={{ flex: 1 }}
+                      tint={
+                        row
+                          ? undefined
+                          : repsTint(
+                              pendingReps,
+                              ex.default_rep_min,
+                              ex.default_rep_max,
+                              last?.reps ?? null
+                            )
+                      }
+                      onChange={(n) => {
+                        setRepsPerSet((prev) => {
+                          const next = [...prev];
+                          next[idx] = n;
+                          return next;
+                        });
+                      }}
+                    />
+                    <LogButton
+                      logged={!!row}
+                      disabled={
+                        !row && (pendingReps == null || pendingReps <= 0)
+                      }
+                      onPress={() => {
+                        if (row) onDeleteSet(row.id);
+                        else commit();
+                      }}
+                    />
+                  </>
+                )}
               </View>
               {last && (
                 <View style={c.setLastInline}>
                   <View style={{ width: 42 }} />
-                  <Text style={c.setLastInlineKg}>
-                    last · {last.weight} kg
-                  </Text>
-                  <Text style={c.setLastInlineReps}>last · {last.reps}</Text>
-                  <View style={{ width: 52 }} />
+                  {timed ? (
+                    <Text style={c.setLastInlineReps}>
+                      last · {fmtSecs(last.reps)}
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={c.setLastInlineKg}>
+                        last · {last.weight} kg
+                      </Text>
+                      <Text style={c.setLastInlineReps}>last · {last.reps}</Text>
+                      <View style={{ width: 52 }} />
+                    </>
+                  )}
                 </View>
-              )}
-              {/* Drop-set ladder hangs off the last logged set of the exercise. */}
-              {row && row.id === logged[logged.length - 1]?.id && (
-                <DropLadder
-                  setRow={row}
-                  drops={dropsBySet.get(row.id) ?? []}
-                  increment={ex.min_increment_kg}
-                  onBegin={onBeginDrop}
-                  onAdd={(seq, w, r) => onAddDrop(row.id, seq, w, r)}
-                  onDelete={onDeleteDrop}
-                />
               )}
             </Pressable>
           );
@@ -977,7 +946,9 @@ export default function ActiveWorkout() {
   } | null>(null);
   const [editingSet, setEditingSet] = useState<SetRow | null>(null);
   const [skipped, setSkipped] = useState<Set<number>>(new Set());
-  const [dropsBySet, setDropsBySet] = useState<Map<number, DropRow[]>>(new Map());
+  const [regressionByEx, setRegressionByEx] = useState<
+    Map<number, RegressionHint>
+  >(new Map());
 
   // Load prescription + last-session data. Reusable so mid-workout template
   // edits (add / remove exercise) can refresh the list in place.
@@ -986,18 +957,22 @@ export default function ActiveWorkout() {
     const rows = await getPrescribedExercises(db, Number(templateId));
     const byEx = new Map<number, LastSet>();
     const bySession = new Map<number, Map<number, LastSet>>();
+    const byReg = new Map<number, RegressionHint>();
     for (const p of rows) {
-      const [ls, session] = await Promise.all([
+      const [ls, session, reg] = await Promise.all([
         getLastSetForExercise(db, p.exercise_id, workoutId),
         getLastSessionSetsForExercise(db, p.exercise_id, workoutId),
+        getRegressionHint(db, p.exercise_id, workoutId),
       ]);
       if (ls) byEx.set(p.exercise_id, ls);
       if (session.size > 0) bySession.set(p.exercise_id, session);
+      if (reg) byReg.set(p.exercise_id, reg);
     }
     // Set everything in one render so ActiveCard's state initializer sees
     // a populated lastSessionSets map (used to pre-fill reps).
     setLastSetByEx(byEx);
     setLastSessionByEx(bySession);
+    setRegressionByEx(byReg);
     setPrescribed(rows);
   }, [db, templateId, workoutId]);
   useEffect(() => {
@@ -1019,20 +994,12 @@ export default function ActiveWorkout() {
   }, [db, templateId, loadPrescription]);
 
   const reload = useCallback(async () => {
-    const [rows, skip, dropRows] = await Promise.all([
+    const [rows, skip] = await Promise.all([
       getSetsForWorkout(db, workoutId),
       getSkippedForWorkout(db, workoutId),
-      getDropsForWorkout(db, workoutId),
     ]);
     setSets(rows);
     setSkipped(skip);
-    const bySet = new Map<number, DropRow[]>();
-    for (const d of dropRows) {
-      const arr = bySet.get(d.set_id);
-      if (arr) arr.push(d);
-      else bySet.set(d.set_id, [d]);
-    }
-    setDropsBySet(bySet);
   }, [db, workoutId]);
   useEffect(() => {
     reload();
@@ -1128,38 +1095,6 @@ export default function ActiveWorkout() {
   const handleEditSet = (row: SetRow) => {
     Haptics.selectionAsync();
     setEditingSet(row);
-  };
-
-  // ── Drop sets ──────────────────────────────────────────────
-  // Opening the drop editor cancels any running rest (no rest between drops).
-  const handleBeginDrop = async () => {
-    await rest.skip();
-  };
-
-  const handleAddDrop = async (
-    setId: number,
-    dropSeq: number,
-    weight: number,
-    reps: number
-  ) => {
-    const row = sets.find((s) => s.id === setId);
-    const ex = row
-      ? prescribed.find((p) => p.exercise_id === row.exercise_id)
-      : null;
-    await addDrop(db, setId, dropSeq, weight, reps);
-    await reload();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Rest restarts from the end of this drop — the burnout bout is over.
-    await rest.start({
-      seconds: ex?.default_rest_seconds ?? 90,
-      label: ex ? `${ex.exercise_name} · after drop set` : "Rest",
-    });
-  };
-
-  const handleDeleteDrop = async (dropId: number) => {
-    await deleteDrop(db, dropId);
-    await reload();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSkip = (ex: PrescribedExercise) => {
@@ -1321,17 +1256,7 @@ export default function ActiveWorkout() {
               />
             );
           if (done)
-            return (
-              <DoneCard
-                key={ex.id}
-                ex={ex}
-                logged={logged}
-                dropsBySet={dropsBySet}
-                onAddDrop={handleAddDrop}
-                onDeleteDrop={handleDeleteDrop}
-                onBeginDrop={handleBeginDrop}
-              />
-            );
+            return <DoneCard key={ex.id} ex={ex} logged={logged} />;
           if (ex.exercise_id === activeId)
             return (
               <ActiveCard
@@ -1342,13 +1267,10 @@ export default function ActiveWorkout() {
                 lastSessionSets={
                   lastSessionByEx.get(ex.exercise_id) ?? new Map()
                 }
-                dropsBySet={dropsBySet}
+                regression={regressionByEx.get(ex.exercise_id) ?? null}
                 onLogSet={(idx, w, r) => handleLogSet(ex, idx, w, r)}
                 onDeleteSet={handleDeleteSet}
                 onEditSet={handleEditSet}
-                onAddDrop={handleAddDrop}
-                onDeleteDrop={handleDeleteDrop}
-                onBeginDrop={handleBeginDrop}
                 onSkip={() => handleSkip(ex)}
               />
             );
@@ -1567,72 +1489,52 @@ const c = StyleSheet.create({
     letterSpacing: 1.5,
   },
 
-  // ── Drop-set ladder ──
-  dropWrap: {
-    marginTop: 8,
-    marginLeft: 18,
-    paddingLeft: 12,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.accent,
+  // ── Drop-set pill ──
+  pillDrop: { backgroundColor: "rgba(255,167,38,0.18)" },
+  pillDropText: { color: colors.warning, letterSpacing: 1 },
+
+  // ── Regression hint ──
+  regress: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    paddingLeft: 10,
+    paddingVertical: 6,
+    marginTop: 10,
+    marginBottom: 4,
   },
-  dropRow: {
+  regressText: { color: colors.warning, fontSize: 12, fontWeight: "700" },
+
+  // ── Plank / time-based timer ──
+  timerRow: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 7,
+    justifyContent: "space-between",
+    gap: 10,
   },
-  dropTag: {
-    width: 14,
-    color: colors.accent,
-    fontSize: 14,
-    textAlign: "center",
-  },
-  dropCellKg: {
-    width: 96,
-    alignItems: "center",
-  },
-  dropCellReps: {
-    flex: 1,
-    alignItems: "center",
-  },
-  dropVal: {
+  timerElapsed: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     fontVariant: ["tabular-nums"],
   },
-  dropDelBtn: {
-    width: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dropDelText: {
-    color: colors.textSecondary,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  dropAdd: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  timerBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "rgba(74,144,217,0.5)",
-    marginTop: 2,
-    marginBottom: 2,
+    minWidth: 124,
+    alignItems: "center",
   },
-  dropAddText: {
-    color: colors.accent,
-    fontSize: 11,
+  timerStart: { backgroundColor: colors.accent },
+  timerStartText: { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 1 },
+  timerStop: { backgroundColor: colors.danger },
+  timerStopText: { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 1 },
+  timerLogged: {
+    flex: 1,
+    color: colors.success,
+    fontSize: 18,
     fontWeight: "800",
-    letterSpacing: 1.5,
-  },
-  dropNoRest: {
-    color: colors.warning,
-    fontSize: 10.5,
-    marginTop: 2,
-    marginBottom: 4,
+    fontVariant: ["tabular-nums"],
   },
 
   coach: {

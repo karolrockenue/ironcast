@@ -14,6 +14,7 @@ import * as Sharing from "expo-sharing";
 import { colors } from "../../src/theme/colors";
 import { useDB } from "../../src/db/provider";
 import { getAllSetsForExport, ExportRow } from "../../src/db/queries";
+import { PLAN_NAMES } from "../../src/db/schema";
 
 const PRIVACY_URL = "https://karolrockenue.github.io/ironcast/privacy.html";
 
@@ -29,11 +30,12 @@ function buildCsv(rows: ExportRow[]): string {
   const header =
     "date,workout,deadlift_mode,exercise,set,drop,weight_kg,reps,volume_kg,muscle_group,session_duration_min";
   const lines = rows.map((r) => {
+    // Map the plan name to its rotation letter (A/B/C); fall back to the raw
+    // name for custom templates.
+    const planIdx = r.template_name ? PLAN_NAMES.indexOf(r.template_name) : -1;
     const workout =
-      r.template_name === "Workout A"
-        ? "A"
-        : r.template_name === "Workout B"
-        ? "B"
+      planIdx >= 0
+        ? String.fromCharCode(65 + planIdx)
         : r.template_name ?? "";
     const volume = +(r.weight * r.reps).toFixed(2);
     let dur = "";

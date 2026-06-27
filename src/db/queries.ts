@@ -1,4 +1,5 @@
 import * as SQLite from "expo-sqlite";
+import { PLAN_NAMES } from "./schema";
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -38,6 +39,7 @@ export type SetRow = {
   exercise_name: string;
   exercise_muscle_group: string;
   exercise_movement_type: string;
+  exercise_special_rules: string | null; // 'timed' → reps holds seconds
   set_number: number;
   reps: number;
   weight: number;
@@ -73,7 +75,7 @@ export type TemplateExercise = {
 };
 
 export type PrescribedExercise = TemplateExercise & {
-  default_sets: number;
+  default_sets: number; // effective: per-plan template_exercises.sets if set, else exercise default
   default_rep_min: number;
   default_rep_max: number;
   default_rest_seconds: number;
@@ -83,6 +85,7 @@ export type PrescribedExercise = TemplateExercise & {
   weight_display_mode: "total" | "per_hand";
   is_per_arm: number;
   special_rules: string | null;
+  is_drop_set: number; // per-plan: show the DROP SET pill (reminder, not logged)
 };
 
 // ───────────────────────────────────────────────────────────
@@ -143,10 +146,12 @@ export async function getPrescribedExercises(
 ) {
   return db.getAllAsync<PrescribedExercise>(
     `SELECT te.*, e.name as exercise_name, e.muscle_group, e.movement_type,
-            e.default_sets, e.default_rep_min, e.default_rep_max,
+            COALESCE(te.sets, e.default_sets) as default_sets,
+            e.default_rep_min, e.default_rep_max,
             e.default_rest_seconds, e.weight_increment,
             e.min_increment_kg, e.back_off_ratio, e.weight_display_mode,
-            e.is_per_arm, e.special_rules
+            e.is_per_arm, e.special_rules,
+            te.is_drop_set as is_drop_set
      FROM template_exercises te
      JOIN exercises e ON e.id = te.exercise_id
      WHERE te.template_id = ?
@@ -209,6 +214,33 @@ export async function updateExercisePrescription(
       p.default_rest_seconds,
       exerciseId,
     ]
+  );
+}
+
+// Per-plan working-set count (template_exercises.sets). Unlike the rep range /
+// rest (which live on the shared exercise row), set count is per-plan: the same
+// exercise can be 2 sets in one template and 3 in another.
+export async function updateTemplateExerciseSets(
+  db: SQLite.SQLiteDatabase,
+  templateExerciseId: number,
+  sets: number
+) {
+  await db.runAsync(
+    "UPDATE template_exercises SET sets = ? WHERE id = ?",
+    [sets, templateExerciseId]
+  );
+}
+
+// Per-plan drop-set flag (template_exercises.is_drop_set) — drives the yellow
+// DROP SET pill on the active card. A reminder only; drops aren't logged.
+export async function updateTemplateExerciseDropSet(
+  db: SQLite.SQLiteDatabase,
+  templateExerciseId: number,
+  isDropSet: boolean
+) {
+  await db.runAsync(
+    "UPDATE template_exercises SET is_drop_set = ? WHERE id = ?",
+    [isDropSet ? 1 : 0, templateExerciseId]
   );
 }
 
@@ -406,7 +438,9 @@ export async function getSetsForWorkout(
   workoutId: number
 ) {
   return db.getAllAsync<SetRow>(
-    `SELECT s.*, e.name as exercise_name, e.muscle_group as exercise_muscle_group, e.movement_type as exercise_movement_type
+    `SELECT s.*, e.name as exercise_name, e.muscle_group as exercise_muscle_group,
+            e.movement_type as exercise_movement_type,
+            e.special_rules as exercise_special_rules
      FROM sets s
      JOIN exercises e ON e.id = s.exercise_id
      WHERE s.workout_id = ?
@@ -512,11 +546,12 @@ export async function getUnfinishedWorkout(db: SQLite.SQLiteDatabase) {
 }
 
 // ───────────────────────────────────────────────────────────
-// A/B plan alternation
+// A/B/C plan rotation (3-way cycle)
 // ───────────────────────────────────────────────────────────
 
-// Strict alternation: look at the most recent *finished* workout. If it was A,
-// next is B. If B or nothing, next is A.
+// 3-way rotation: look at the most recent *finished* workout's template and
+// advance to the next plan in PLAN_NAMES order (A→B→C→A). If the last plan
+// isn't in the rotation (or there's no history), start at the first plan.
 export async function getNextWorkoutPlan(db: SQLite.SQLiteDatabase) {
   const last = await db.getFirstAsync<{ template_name: string }>(
     `SELECT t.name as template_name
@@ -525,8 +560,9 @@ export async function getNextWorkoutPlan(db: SQLite.SQLiteDatabase) {
      WHERE w.finished_at IS NOT NULL
      ORDER BY w.started_at DESC LIMIT 1`
   );
-  const lastName = last?.template_name ?? "";
-  const nextName = lastName === "Workout A" ? "Workout B" : "Workout A";
+  const idx = last ? PLAN_NAMES.indexOf(last.template_name) : -1;
+  const nextName =
+    idx === -1 ? PLAN_NAMES[0] : PLAN_NAMES[(idx + 1) % PLAN_NAMES.length];
   return db.getFirstAsync<TemplateWithCount>(
     `SELECT t.*, COUNT(te.id) as exercise_count
      FROM templates t
@@ -580,15 +616,19 @@ export function decideProgression(
   const { weight, reps } = lastSet;
   const { rep_min, rep_max, weight_increment } = ex;
 
-  // Bodyweight / "add a rep" exercises (e.g. hanging leg raises)
+  // Bodyweight / "add a rep" exercises (e.g. hanging leg raises) and time-based
+  // exercises (Plank — `reps` holds the held duration in seconds).
   if (weight_increment === 0) {
+    const timed = ex.special_rules === "timed";
     if (reps >= rep_max) {
       return {
         direction: "reps_only",
         suggested_weight: weight,
         last_weight: weight,
         last_reps: reps,
-        message: `Hit top of range — aim past ${rep_max} reps next time`,
+        message: timed
+          ? `Held past ${rep_max}s — aim for more time`
+          : `Hit top of range — aim past ${rep_max} reps next time`,
       };
     }
     return {
@@ -597,7 +637,9 @@ export function decideProgression(
       last_weight: weight,
       last_reps: reps,
       message: reps >= rep_min
-        ? "Add a rep next time"
+        ? timed
+          ? "Hold longer next time"
+          : "Add a rep next time"
         : "Below target — aim for the range",
     };
   }
@@ -688,6 +730,62 @@ export async function getLastSessionSetsForExercise(
   return new Map(rows.map((r) => [r.set_number, r]));
 }
 
+// Regression hint: if last session's top set (Set 1) is BELOW a heavier weight
+// you hit in an earlier session, surface that earlier weight as a comeback
+// target. Returns null when the last session was your best (no regression) or
+// there's no history. Prevents a weak-day backslide from reading as progress.
+export type RegressionHint = {
+  last_weight: number;
+  prev_best_weight: number;
+};
+
+export async function getRegressionHint(
+  db: SQLite.SQLiteDatabase,
+  exerciseId: number,
+  excludeWorkoutId?: number
+): Promise<RegressionHint | null> {
+  const params: (string | number)[] = [exerciseId];
+  let excludeClause = "";
+  if (excludeWorkoutId) {
+    excludeClause = " AND w.id != ?";
+    params.push(excludeWorkoutId);
+  }
+  // The most recent finished session that logged this exercise.
+  const lastWorkout = await db.getFirstAsync<{ id: number; started_at: string }>(
+    `SELECT w.id, w.started_at
+     FROM workouts w
+     JOIN sets s ON s.workout_id = w.id
+     WHERE s.exercise_id = ? AND w.finished_at IS NOT NULL${excludeClause}
+     ORDER BY w.started_at DESC LIMIT 1`,
+    params
+  );
+  if (!lastWorkout) return null;
+
+  const lastSet1 = await db.getFirstAsync<{ weight: number }>(
+    `SELECT weight FROM sets
+     WHERE workout_id = ? AND exercise_id = ? AND set_number = 1
+     LIMIT 1`,
+    [lastWorkout.id, exerciseId]
+  );
+  if (!lastSet1) return null;
+
+  // Heaviest Set 1 across sessions STRICTLY BEFORE the last one.
+  const best = await db.getFirstAsync<{ w: number | null }>(
+    `SELECT MAX(s.weight) as w
+     FROM sets s
+     JOIN workouts w ON w.id = s.workout_id
+     WHERE s.exercise_id = ? AND s.set_number = 1
+       AND w.finished_at IS NOT NULL
+       AND w.started_at < ?`,
+    [exerciseId, lastWorkout.started_at]
+  );
+  const prevBest = best?.w ?? 0;
+  if (prevBest > lastSet1.weight) {
+    return { last_weight: lastSet1.weight, prev_best_weight: prevBest };
+  }
+  return null;
+}
+
 // ───────────────────────────────────────────────────────────
 // Summary + progressions for a finished workout
 // ───────────────────────────────────────────────────────────
@@ -711,6 +809,7 @@ export type WorkoutSummary = {
     best_weight: number;
     best_reps: number;
     drops: number; // count of drop-set burnout stages logged for this exercise
+    special_rules: string | null; // 'timed' → best_reps holds seconds
   }[];
   prs: PR[];
 };
@@ -724,8 +823,10 @@ export async function getWorkoutSummary(
     [workoutId]
   );
 
-  const sets = await db.getAllAsync<SetRow>(
-    `SELECT s.*, e.name as exercise_name, e.muscle_group as exercise_muscle_group, e.movement_type as exercise_movement_type
+  const sets = await db.getAllAsync<SetRow & { exercise_special_rules: string | null }>(
+    `SELECT s.*, e.name as exercise_name, e.muscle_group as exercise_muscle_group,
+            e.movement_type as exercise_movement_type,
+            e.special_rules as exercise_special_rules
      FROM sets s JOIN exercises e ON e.id = s.exercise_id
      WHERE s.workout_id = ? ORDER BY s.exercise_id, s.set_number`,
     [workoutId]
@@ -762,7 +863,14 @@ export async function getWorkoutSummary(
   // Per-exercise breakdown
   const byEx = new Map<
     number,
-    { name: string; sets: number; best_weight: number; best_reps: number; volume: number }
+    {
+      name: string;
+      sets: number;
+      best_weight: number;
+      best_reps: number;
+      volume: number;
+      special_rules: string | null;
+    }
   >();
   for (const st of sets) {
     const cur = byEx.get(st.exercise_id);
@@ -774,6 +882,7 @@ export async function getWorkoutSummary(
         best_weight: st.weight,
         best_reps: st.reps,
         volume: v,
+        special_rules: st.exercise_special_rules,
       });
     } else {
       cur.sets++;
@@ -853,6 +962,7 @@ export async function getWorkoutSummary(
       best_weight: e.best_weight,
       best_reps: e.best_reps,
       drops: dropCountByEx.get(exId) ?? 0,
+      special_rules: e.special_rules,
     })),
     prs,
   };

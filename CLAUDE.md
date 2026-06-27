@@ -1,10 +1,10 @@
 # IronCast — Project Blueprint
 
-**Last updated:** 2026-06-11
+**Last updated:** 2026-06-27
 
 IronCast (renamed from IronLog on 2026-04-20; `IronLog` was already on the App
-Store) is a React Native / Expo app for guided strength training. It alternates
-the user through a strict two-workout split (A/B), auto-suggests weights based
+Store) is a React Native / Expo app for guided strength training. It rotates
+the user through a three-workout split (A/B/C), auto-suggests weights based
 on last performance, runs rest timers in the background, and logs every set.
 
 This file is the single source of truth for project state. Update it whenever
@@ -43,42 +43,100 @@ No cloud sync, no account system, no telemetry. All data lives on-device.
 
 ## 2. Training philosophy (locked, don't drift)
 
-- Two workout plans: **A** (push + quads) and **B** (pull + shoulders + biceps, plus deadlift).
-- **Strict alternation** based on the last *completed* session — not calendar based. A completed → B next. B completed → A next. Doesn't matter if you trained yesterday or three weeks ago.
-- **2 working sets** per exercise (the only exception: deadlift — see §4).
-- **Set 1 = top working set.** Set 2 = back-off set (a *separate* set after full rest, weight = Set 1 × back-off ratio). The progression engine reads Set 1; Set 2 is informational. **NB — not to be confused with true drop sets** (added in 1.04, §10): those are within-set burnout stages done with *no rest*, stored in `set_drops` and hung off a single parent set. "Back-off Set 2" and "drop set" are different mechanisms.
-- **Automatic weight progression.** Hit top of rep range → increase by the exercise's equipment increment next time. In range (not at top) → same weight, push for more reps. Below range → drop one increment.
-- **Back-off ratio** on Set 2 is per-exercise (0.80 for Lat Pulldown, 0.90 standard, 1.00 for single-arm lateral raise and hanging leg raises).
-- **Deadlift heavy/technique alternation REMOVED (2026-06-11, schema v11).** Deadlift is now a normal 2 × 3–5 exercise with standard progression and 0.90 back-off. The "NOT TODAY" skip covers light weeks. See §4.
-- **Rest timer** is mandatory, prescribed per exercise, runs in the background, notifies on completion.
+**Evolved to a 3-way split on 2026-06-27 (schema v12).** The old A/B split was an
+intentional evolution to A/B/C, titled by dominant muscle. This is a deliberate
+philosophy change, not drift — documented as such.
+
+- Three workout plans, titled by dominant muscle: **A — Chest & Quads**,
+  **B — Back & Hamstrings**, **C — Shoulders & Arms**. (Old "Workout A/B" names
+  were renamed in place; see §3.)
+- **3-way rotation** based on the last *completed* session — not calendar based.
+  A → B → C → A. Derived from the last *finished* session's template, so doing a
+  plan again self-corrects the next suggestion. The home next-up card's
+  `⇄ Do {plan} instead` override cycles through all three for the current session
+  only (resets on focus). Engine: `getNextWorkoutPlan` over `PLAN_NAMES`.
+- **Variable working-set count per exercise.** Plans mix 2-set and 3-set
+  exercises. Set count is **per-plan**, stored in `template_exercises.sets`
+  (the same exercise can be 2 sets in one plan and 3 in another — e.g. Single
+  Arm Lateral Raise is 2 in A, 3 in C). `getPrescribedExercises` returns
+  `COALESCE(te.sets, e.default_sets)`.
+- **Set 1 = top working set.** Set 2+ = back-off sets (a *separate* set after
+  full rest, weight = Set 1 × back-off ratio). The progression engine reads
+  Set 1; later sets are informational.
+- **Drop sets are a marker, not logged (changed 2026-06-27).** `final set is a
+  drop set` exercises carry a per-plan `template_exercises.is_drop_set` flag that
+  renders a yellow **DROP SET** pill on the card — a reminder to do the burnout
+  on the floor. The old in-app drop-logging (`set_drops` ladder) UI was removed;
+  the `set_drops` table is kept so previously-logged drops still render in
+  history. ("Back-off Set 2" and "drop set" remain different concepts.)
+- **Time-based exercises (Plank).** `special_rules = 'timed'`: the active card
+  shows a count-up timer (START → STOP & LOG); the held duration in **seconds**
+  is stored in the `reps` column (weight 0). Progression aims for more seconds.
+- **Automatic weight progression.** Hit top of rep range → increase by the
+  exercise's equipment increment next time. In range (not at top) → same weight,
+  push for more reps. Below range → drop one increment.
+- **Regression hint.** When the last session's top set is *below* a heavier
+  weight hit in an earlier session (e.g. 50 → 45 on a weak day), the active card
+  surfaces the earlier weight as a comeback target so a recovered weight doesn't
+  read as fresh progress. Query: `getRegressionHint`.
+- **Back-off ratio** is per-exercise (0.80 for Lat Pulldown, 0.90 standard, 1.00
+  for single-arm lateral raise and bodyweight/core).
+- **Deadlift** is a normal 2 × 3–5 exercise (heavy/technique modes removed in
+  v11, see §4); it lives in Plan B and is optional per session via "NOT TODAY".
+- **Rest timer** is mandatory, prescribed per exercise, runs in the background,
+  notifies on completion.
 
 ---
 
-## 3. Pre-seeded workout plans
+## 3. Pre-seeded workout plans (3-way split, v12)
 
-Both are 7 exercises. Values from Addendum 3 + 4.
+Defined in `schema.ts → PLANS` (structure: name, per-item sets + drop flag).
+Exercise rows live in `WORKOUT_A`/`WORKOUT_B`/`CATALOG`; plan rep ranges win on
+name collision. "Drop" = `is_drop_set` (yellow pill reminder, last set on the
+floor). Plan A's flat-bench slot reuses the existing `Bench Press (Smith
+Machine)` row (carries logged history); `Flat Bench (Machine)` was added to the
+catalog as a separate selectable exercise.
 
-### Workout A — Push + Quads
-| # | Exercise | Sets × Reps | Rest | Increment | Back-off |
-|---|----------|-------------|------|-----------|----------|
-| 1 | Hack Squat (Machine)              | 2 × 5–8    | 3:00 | 2.5 kg | 0.90 |
-| 2 | Bench Press (Smith Machine)       | 2 × 5–8    | 2:30 | 2.5 kg | 0.90 |
-| 3 | Incline Bench Press (Dumbbell)    | 2 × 6–10   | 2:30 | 1 kg (per hand) | 0.90 |
-| 4 | Leg Extension (Machine)           | 2 × 8–12   | 1:30 | 2.5 kg | 0.90 |
-| 5 | Single Arm Cable Tricep Pushdown  | 2 × 8–12   | 1:15 | 2.5 kg | 0.90 |
-| 6 | Single Arm Lateral Raise (Cable)  | 2 × 10–15  | 1:00 | 2.5 kg | **1.00 (straight)** |
-| 7 | Hanging Leg Raises                | 2 × 8–15   | 1:15 | 0 (BW) | 1.00 |
+### Workout A — "Chest & Quads"
+| # | Exercise | Sets × Reps | Drop |
+|---|----------|-------------|------|
+| 1 | Hack Squat (Machine)              | 3 × 6–10   |   |
+| 2 | Leg Extension (Machine)           | 2 × 8–12   | ✓ |
+| 3 | Bench Press (Smith Machine)       | 3 × 6–9    |   |
+| 4 | Incline Chest Press (Machine)     | 2 × 8–12   |   |
+| 5 | Single Arm Cable Tricep Pushdown  | 2 × 8–12   | ✓ |
+| 6 | Single Arm Lateral Raise (Cable)  | 2 × 10–12  | ✓ (back-off 1.00) |
+| 7 | Cable Crunch                      | 2 × 10–15  |   |
+| 8 | Pallof Press (Cable)              | 2 × 10–12  | (per side) |
 
-### Workout B — Pull + Shoulders + Biceps
-| # | Exercise | Sets × Reps | Rest | Increment | Back-off |
-|---|----------|-------------|------|-----------|----------|
-| 1 | Deadlift (Barbell)                | 2 × 3–5    | 3:00 | 2.5 kg | 0.90 |
-| 2 | Shoulder Press (Machine Plates)   | 2 × 5–8    | 2:30 | 2.5 kg | 0.90 |
-| 3 | Lat Pulldown (Cable)              | 2 × 5–8    | 2:30 | **5 kg** | **0.80** |
-| 4 | Seated Row (Machine)              | 2 × 6–10   | 2:00 | 5 kg | 0.90 |
-| 5 | Bicep Curl (Dumbbell)             | 2 × 8–12   | 1:15 | 1 kg (per hand) | 0.90 |
-| 6 | Single Arm Lateral Raise (Cable)  | 2 × 10–15  | 1:00 | 2.5 kg | 1.00 |
-| 7 | Hanging Leg Raises                | 2 × 8–15   | 1:15 | 0 (BW) | 1.00 |
+### Workout B — "Back & Hamstrings"
+| # | Exercise | Sets × Reps | Drop |
+|---|----------|-------------|------|
+| 1 | Deadlift (Barbell)                | 2 × 3–5    | (optional — "NOT TODAY") |
+| 2 | Glute Bridge (Barbell)            | 3 × 8–12   |   |
+| 3 | Leg Curl (Seated Machine)         | 3 × 8–12   | ✓ |
+| 4 | Lat Pulldown (Cable)              | 3 × 6–10   | (back-off 0.80, 5 kg) |
+| 5 | Seated Row (Machine)              | 3 × 8–12   |   |
+| 6 | Bicep Curl (Dumbbell)             | 3 × 8–12   | ✓ |
+| 7 | Side Bend (Dumbbell or Cable)     | 2 × 10–15  | (per side) |
+| 8 | Cable Crunch                      | 2 × 10–15  |   |
+| 9 | Plank                             | 2 × 30–60s | (timed) |
+
+### Workout C — "Shoulders & Arms"
+| # | Exercise | Sets × Reps | Drop |
+|---|----------|-------------|------|
+| 1 | Shoulder Press (Machine Plates)   | 3 × 6–9    |   |
+| 2 | Incline Chest Press (Machine)     | 2 × 8–12   | (same row as A) |
+| 3 | Single Arm Lateral Raise (Cable)  | 3 × 10–12  | ✓ (back-off 1.00) |
+| 4 | Overhead Tricep Extension (Cable Rope) | 2 × 8–12 | ✓ |
+| 5 | Bicep Curl (Dumbbell)             | 2 × 8–12   | ✓ |
+| 6 | Back Extension                    | 2 × 10–15  |   |
+| 7 | Side Bend (Dumbbell or Cable)     | 2 × 10–15  | (per side) |
+| 8 | Cable Crunch                      | 2 × 10–15  |   |
+| 9 | Pallof Press (Cable)              | 2 × 10–12  | (per side) |
+
+New exercises added to the catalog in v12: **Flat Bench (Machine)**, **Side Bend
+(Dumbbell or Cable)**, **Plank** (`special_rules='timed'`).
 
 ---
 
@@ -159,7 +217,7 @@ src/
   db/
     provider.tsx           DBContext + initDB bootstrap
     queries.ts             All SQL, progression engine, PR detection, stats
-    schema.ts              Tables + seed + bulk-insert history (SCHEMA_VERSION = 6)
+    schema.ts              Tables + seed + bulk-insert history (SCHEMA_VERSION = 12; PLANS = 3-way split)
   store/
     restTimer.ts           useRestTimer() — wall-clock-based, schedules local notification
     workout.ts             In-memory pubsub for the exercise picker modal
@@ -178,7 +236,7 @@ mockups/
 
 ---
 
-## 7. Data model (SQLite schema v6)
+## 7. Data model (SQLite schema v12)
 
 ```
 exercises
@@ -186,24 +244,39 @@ exercises
   default_sets, default_rep_min, default_rep_max, default_rest_seconds,
   weight_increment, min_increment_kg, back_off_ratio,
   weight_display_mode ('total' | 'per_hand'), is_per_arm (0/1),
-  special_rules ('deadlift_ht' | 'reps_only' | null)
+  special_rules ('reps_only' | 'timed' | null)
+    -- 'timed' (v12): Plank etc. — the active card shows a count-up timer and
+    --   stores the held duration in SECONDS in the reps column (weight 0).
+    -- ('deadlift_ht' was cleared to NULL in v11.)
 
 workouts
   id, started_at, finished_at, notes, template_id,
-  deadlift_mode ('heavy' | 'technique' | null)
+  deadlift_mode ('heavy' | 'technique' | null)   -- read-only legacy
 
 sets
   id, workout_id, exercise_id, set_number, reps, weight, completed_at
+    -- for a 'timed' exercise, reps holds the held seconds, weight is 0
 
 templates
   id, name, created_at
 
 template_exercises
-  id, template_id, exercise_id, sort_order
+  id, template_id, exercise_id, sort_order,
+  sets (per-plan working-set count; NULL → exercises.default_sets),   -- v12
+  is_drop_set (0/1 — show the yellow DROP SET pill; a reminder, not logged) -- v12
 ```
 
-`PRAGMA user_version` drives migrations. Current version: **11** (v11 clears
-`special_rules = 'deadlift_ht'` → NULL; deadlift modes removed, see §4).
+`PRAGMA user_version` drives migrations. Current version: **12**.
+- **v12 (2026-06-27):** A/B → A/B/C split. ADDITIVE for live installs
+  (`migrateForward` from<12): `ALTER TABLE template_exercises ADD COLUMN sets` +
+  `is_drop_set`; upsert plan exercises (insert Plank/Side Bend/Flat Bench,
+  refresh carried rep ranges); rename `Workout A`→`Chest & Quads`,
+  `Workout B`→`Back & Hamstrings` **in place** (preserves `template_id`, so
+  finished workouts keep their linkage); rebuild all three plans'
+  `template_exercises`; create `Shoulders & Arms`. No workout/set data dropped.
+  Progression continuity holds because the engine reads the most recent finished
+  Set 1 by `exercise_id` regardless of template. Helper: `addColumnIfMissing`.
+- v11 cleared `special_rules = 'deadlift_ht'` → NULL (deadlift modes removed, §4).
 
 **Migrations are no longer always destructive (changed 2026-06-08).** v9 shipped
 to the App Store, so `initDB` now branches: a fresh install (`user_version 0`)
@@ -217,12 +290,12 @@ adding an additive step to `migrateForward`, NOT relying on the reseed.
 set_drops
   id, set_id (→ sets.id), drop_seq (1..n), weight, reps
 ```
-Drop-set burnout stages hung off a parent set row (v10). The parent `sets` row
-stays THE set and alone drives progression + PR detection; each `set_drops` row
-is one reduced-weight stage done with no rest. Volume rollups (summary hero,
-Progress total, CSV) add these; PR/progression deliberately ignore them. No FK
-cascade reliance — `deleteSet`/`deleteWorkout` clear drops explicitly. Helpers:
-`addDrop`, `deleteDrop`, `getDropsForWorkout`.
+Drop-set burnout stages hung off a parent set row (v10). **The in-app
+drop-LOGGING UI was removed in v12** (drop sets are now just a yellow pill
+reminder — see §2/§10). The table is kept so previously-logged drops still
+render in History (and feed CSV/volume rollups); no new rows are written by the
+active screen anymore. Helpers retained for history/CSV: `addDrop` (unused by
+UI), `deleteDrop`, `getDropsForWorkout`.
 
 ```
 workout_skipped_exercises
@@ -285,8 +358,11 @@ Derived state on first launch:
 - **No slider for rep input.** Too fiddly at phone scale. Numeric stepper (typed + ± buttons) with placeholder = last session's reps at that set number.
 - **Live tint on reps input:** green (in range), blue (at/above top), yellow (below range), **red (regression vs last session)**. Red wins.
 - **KG stepper is fixed 108 px width.** REPS stepper takes flex remainder. Avoids the conflicting `flex: 1` + `width` bug that collapsed the KG stepper.
-- **Home: V02 Journal feed.** Reverse-chronological entries — in-progress banner (if any) → today/next-up with Start → past sessions. Deadlift mode + weight shown inline on the next-up card.
-- **No per-arm tracking.** "Single Arm" exercises log as 2 sets normally; user handles both arms mentally.
+- **Home: V02 Journal feed.** Reverse-chronological entries — in-progress banner (if any) → today/next-up with Start → past sessions. The `⇄ Do {plan} instead` override now **cycles through all three** plans (A→B→C→A), not a binary A↔B swap.
+- **Drop sets are a yellow pill, not logged (v12).** A `DROP SET` pill on the card (driven by `template_exercises.is_drop_set`) reminds you to do the burnout; there's no in-app drop logging. Editable per-plan in the template editor (sets stepper + drop toggle write to `template_exercises`, not the shared exercise row).
+- **Time-based exercises (Plank, v12):** count-up timer on the card (START → STOP & LOG), seconds stored in `reps`, weight 0. Shown as `M:SS` everywhere (active/last-session/summary/history). The plank count-up is foreground-only (you watch the screen for a 30–60 s hold); the between-set rest timer keeps using the background wall-clock timer.
+- **Regression hint (v12):** amber line on the active card when the last top set is below an earlier best, so a recovered weight isn't mistaken for a PR.
+- **No per-arm tracking.** "Single Arm" / "per side" exercises log as N sets normally; user handles both sides mentally.
 - **Footer actions removed** from active workout. Auto-advance handles the "next exercise" flow when the current card's sets are all logged.
 - **PR celebration:** No emoji. Renders a brutalist "PR" wordmark in an accent-bordered frame with an accent divider bar, `NEW WEIGHT/REPS/VOLUME RECORD` meta line, exercise name, value (`src/components/PrCelebration.tsx`). Matches splash aesthetic.
 - **Tab bar:** Custom SVG icons (dumbbell / clock-arrow / bar-chart) via `react-native-svg`; stroke thickens when focused. Tab labels all-caps 11px with letter-spacing; header titles stay sentence-case (`tabBarLabel` separate from `title`).
@@ -311,8 +387,12 @@ Derived state on first launch:
 - [x] History tab listing all finished workouts
 
 ### Smart behaviour
-- [x] Strict A/B alternation from last *finished* session's template
-- [x] **Override alternation for today** — `⇄ Do Workout X instead` switch on the home next-up card swaps A↔B for the current session only. Per-visit (resets on tab focus), shows a "normally Workout Y" note when overriding. No persistence — alternation self-corrects from the next *finished* session.
+- [x] **3-way rotation** (A→B→C→A) from last *finished* session's template (`getNextWorkoutPlan` over `PLAN_NAMES`)
+- [x] **Override rotation for today** — `⇄ Do {plan} instead` on the home next-up card cycles through all three plans for the current session only. Per-visit (resets on tab focus), shows a "normally {plan}" note when overriding. No persistence — rotation self-corrects from the next *finished* session.
+- [x] **Variable per-plan set counts** (`template_exercises.sets`) — a 3-set exercise renders/logs 3 working sets; progression still reads Set 1
+- [x] **Drop-set pill** (yellow `DROP SET`) on flagged exercises — reminder only, not logged
+- [x] **Plank / time-based exercises** — count-up timer, seconds in `reps`, `M:SS` display, "aim for more time" progression
+- [x] **Regression hint** — earlier heavier top set surfaced as a comeback target when last session regressed
 - ~~Deadlift heavy/technique alternation~~ — REMOVED 2026-06-11 (schema v11, see §4)
 - [x] Back-off Set 2 weight auto-recalculates after Set 1 is logged
 - [x] Progression engine using Set 1 (top set), not last numerical set
@@ -341,7 +421,14 @@ Derived state on first launch:
 - [x] Tap × on a logged row → single-tap delete; `renumberSetsForExercise` keeps `set_number` contiguous so Set 1 = top-set invariant holds for progression
 - [x] Not exposed in history view — editing a *past* session would shift "last session" lookups and is deferred
 
-### Drop sets (1.04)
+### Drop sets — LOGGING REMOVED in v12 (now a pill, see §2)
+> **v12 (2026-06-27):** the in-app drop-LOGGING UI below was removed. Drop sets
+> are now a yellow `DROP SET` pill (`template_exercises.is_drop_set`) — a
+> reminder to do the burnout on the floor, not something you log. The `set_drops`
+> table + History rendering are kept for previously-logged drops. The 1.04 notes
+> below are retained for historical context only.
+
+### Drop sets (1.04 — logging UI, removed in v12)
 - [x] **`⇊ DROP SET` affordance** under the last logged set of an exercise — appears on both the active card (`DropLadder` under the last logged set) and the done card. Tap it to start a burnout stage.
 - [x] **Auto-fill at 75%** — each new drop pre-fills weight = previous stage × 0.75 rounded to the exercise increment (`roundToIncrement`); reps are typed (placeholder = previous stage's reps). Add multiple via `＋ ADD DROP`.
 - [x] **No rest between drops** — opening the drop editor cancels any running rest (`onBeginDrop` → `rest.skip()`); logging the drop restarts it (`handleAddDrop` → `rest.start`). Matches how a drop set is performed.
@@ -658,6 +745,33 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 ---
 
 ## 17. Next session — pick up here
+
+**1.06 (2026-06-27) — 3-way split + drop pill + plank + regression hint.**
+COMMITTED locally as `b4159ab`, `app.json` version → **1.06**, schema **v12**.
+NOT yet pushed / built / submitted (the session that wrote it had no network).
+Run from a networked shell: `git push origin main` →
+`npx eas-cli@latest build --platform ios --profile production` →
+`npx eas-cli@latest submit --platform ios --latest` → ASC manual steps (§15).
+- **A/B → A/B/C split.** Three plans titled by muscle (Chest & Quads / Back &
+  Hamstrings / Shoulders & Arms). Additive migration (rename A/B in place,
+  rebuild contents, add C, add `template_exercises.sets` + `is_drop_set`). 3-way
+  rotation + home override cycle. See §2/§3/§7.
+- **Drop sets → yellow pill** (logging UI removed; `set_drops` table kept for
+  history). Editable per-plan in the template editor (sets stepper + drop toggle).
+- **Plank / time-based exercises** (`special_rules='timed'`) — count-up timer,
+  seconds in `reps`, `M:SS` display.
+- **Regression hint** on the active card (`getRegressionHint`).
+- Files touched: `schema.ts`, `queries.ts`, `app/(tabs)/index.tsx`,
+  `app/workout/active.tsx`, `app/workout/summary.tsx`, `app/(tabs)/history.tsx`,
+  `app/templates/[id].tsx`, `app/(tabs)/settings.tsx`, `CLAUDE.md`. `tsc` clean.
+- **TODO before shipping:** test the v12 migration on a real v11 install (history
+  preserved, plans renamed, C appears, Plank logs time); then bump `version` in
+  `app.json` (live store is 1.02 → next is **1.06** since 1.05 already used a
+  build), build + submit, commit. Consider an HTML mockup pass if anything looks
+  off on-device. Progress-tab "Current Weights" still shows Plank as `0 kg`
+  (minor — not yet formatted as time there).
+
+---
 
 **1.05 (build 16) is BUILT + SUBMITTED** (2026-06-13, committed `218276b`, pushed).
 It shipped two changes:

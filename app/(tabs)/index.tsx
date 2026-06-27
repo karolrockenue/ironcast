@@ -13,6 +13,7 @@ import {
   WorkoutHistoryRow,
 } from "../../src/db/queries";
 import { colors } from "../../src/theme/colors";
+import { PLAN_NAMES } from "../../src/db/schema";
 
 function fmtDay(dateStr: string): { weekday: string; monthDay: string } {
   // SQLite 'YYYY-MM-DD HH:MM:SS' is interpreted in local time by the browser's
@@ -43,10 +44,11 @@ function fmtDurationMin(started: string, finished: string | null): number {
   return Math.round((f - s) / 60000);
 }
 
+// A/B/C letter from the plan's position in the rotation order.
 function planLetterOf(name: string | null | undefined): string {
   if (!name) return "?";
-  if (name.includes("B")) return "B";
-  return "A";
+  const i = PLAN_NAMES.indexOf(name);
+  return i >= 0 ? String.fromCharCode(65 + i) : "A";
 }
 
 export default function WorkoutTab() {
@@ -119,13 +121,16 @@ export default function WorkoutTab() {
   // Override state: the displayed plan differs from the alternation default.
   const isOverride =
     !!autoPlan && !!nextPlan && nextPlan.name !== autoPlan.name;
-  // The other seeded A/B plan to offer as a one-tap switch.
-  const otherPlan =
-    templates.find(
-      (t) =>
-        (t.name === "Workout A" || t.name === "Workout B") &&
-        t.name !== nextPlan?.name
-    ) ?? null;
+  // Rotation plans in A→B→C order, then the next one to offer as a one-tap
+  // switch. Repeated taps cycle through all three (A→B→C→A).
+  const rotationPlans = PLAN_NAMES.map((n) =>
+    templates.find((t) => t.name === n)
+  ).filter((t): t is TemplateWithCount => !!t);
+  const curIdx = rotationPlans.findIndex((t) => t.name === nextPlan?.name);
+  const nextInCycle =
+    rotationPlans.length > 1 && curIdx >= 0
+      ? rotationPlans[(curIdx + 1) % rotationPlans.length]
+      : null;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -172,13 +177,13 @@ export default function WorkoutTab() {
           <Pressable style={[styles.btn, styles.btnAccent]} onPress={handleStart}>
             <Text style={styles.btnText}>START WORKOUT {planLetter}</Text>
           </Pressable>
-          {otherPlan && (
+          {nextInCycle && (
             <Pressable
               style={styles.switchBtn}
-              onPress={() => setChosenName(otherPlan.name)}
+              onPress={() => setChosenName(nextInCycle.name)}
             >
               <Text style={styles.switchText}>
-                {"⇄"}  Do {otherPlan.name} instead
+                {"⇄"}  Do {nextInCycle.name} instead
               </Text>
             </Pressable>
           )}
