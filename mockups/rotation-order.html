@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rotation Order — Templates tab</title>
+<style>
+  :root {
+    --bg: #0D0D0D; --surface: #1A1A1A; --surfaceLight: #252525;
+    --border: #333333; --text: #F5F5F5; --textSecondary: #999999;
+    --accent: #4A90D9; --accentLight: #6AA8E8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: #000; font-family: -apple-system, sans-serif; }
+  .phone {
+    width: 390px; margin: 24px auto; background: var(--bg);
+    min-height: 760px; border-radius: 36px; overflow: hidden;
+    border: 1px solid #222; position: relative; padding: 0 16px 16px;
+  }
+  .navTitle { color: var(--text); font-size: 28px; font-weight: 800; padding: 56px 0 4px; letter-spacing: -0.5px; }
+
+  .section { color: var(--textSecondary); font-size: 12px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase; margin: 22px 4px 10px; }
+
+  /* Rotation strip */
+  .rotCard { background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; }
+  .rotRow { display: flex; align-items: center; gap: 12px; padding: 14px 14px;
+    border-bottom: 1px solid var(--border); }
+  .rotRow:last-child { border-bottom: none; }
+  .badge { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 9px;
+    background: var(--accent); color: #fff; font-weight: 800; font-size: 17px;
+    display: flex; align-items: center; justify-content: center; font-family: Impact, sans-serif; }
+  .rotName { flex: 1; color: var(--text); font-size: 16px; font-weight: 700; }
+  .rotPos { color: var(--textSecondary); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.5px; margin-top: 2px; }
+  .arrows { display: flex; flex-direction: column; gap: 4px; }
+  .arrow { width: 38px; height: 26px; border-radius: 7px; background: var(--surfaceLight);
+    border: 1px solid var(--border); color: var(--text); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; }
+  .arrow.disabled { opacity: 0.25; }
+  .rotHint { color: var(--textSecondary); font-size: 12px; margin: 10px 4px 0; line-height: 1.4; }
+  .rotHint b { color: var(--accentLight); font-weight: 700; }
+
+  /* Existing template cards */
+  .card { background: var(--surface); padding: 16px; border-radius: 12px;
+    margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .cardName { color: var(--text); font-size: 16px; font-weight: 700; }
+  .cardCount { color: var(--textSecondary); font-size: 14px; }
+
+  .createBtn { background: var(--accent); padding: 16px; border-radius: 12px;
+    text-align: center; color: var(--text); font-weight: 700; font-size: 16px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="navTitle">Templates</div>
+
+    <div class="section">Rotation order</div>
+    <div class="rotCard" id="rot"></div>
+    <div class="rotHint">Your next workout follows this order. After you finish one,
+      the app suggests the next in the cycle. Letter badges follow the order —
+      <b>top = A</b>.</div>
+
+    <div class="section">Your plans</div>
+    <div class="card"><span class="cardName">Chest &amp; Quads</span><span class="cardCount">8 exercises</span></div>
+    <div class="card"><span class="cardName">Back &amp; Hamstrings</span><span class="cardCount">9 exercises</span></div>
+    <div class="card"><span class="cardName">Shoulders &amp; Arms</span><span class="cardCount">9 exercises</span></div>
+
+    <div class="createBtn">+ New Template</div>
+  </div>
+
+<script>
+  let order = ["Back & Hamstrings", "Chest & Quads", "Shoulders & Arms"];
+  function render() {
+    const el = document.getElementById("rot");
+    el.innerHTML = order.map((name, i) => `
+      <div class="rotRow">
+        <div class="badge">${String.fromCharCode(65 + i)}</div>
+        <div style="flex:1">
+          <div class="rotName">${name}</div>
+          <div class="rotPos">${i === 0 ? "NEXT UP" : i + " after"}</div>
+        </div>
+        <div class="arrows">
+          <div class="arrow ${i === 0 ? "disabled" : ""}" onclick="move(${i},-1)">▲</div>
+          <div class="arrow ${i === order.length - 1 ? "disabled" : ""}" onclick="move(${i},1)">▼</div>
+        </div>
+      </div>`).join("");
+  }
+  function move(i, d) {
+    const j = i + d;
+    if (j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    render();
+  }
+  render();
+</script>
+</body>
+</html>

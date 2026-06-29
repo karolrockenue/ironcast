@@ -5,6 +5,7 @@ import { useDB } from "../../src/db/provider";
 import {
   startWorkout,
   getNextWorkoutPlan,
+  getRotationOrder,
   getAllTemplates,
   getUnfinishedWorkout,
   getWorkoutHistory,
@@ -44,10 +45,13 @@ function fmtDurationMin(started: string, finished: string | null): number {
   return Math.round((f - s) / 60000);
 }
 
-// A/B/C letter from the plan's position in the rotation order.
-function planLetterOf(name: string | null | undefined): string {
+// A/B/C letter from the plan's position in the user's rotation order.
+function planLetterOf(
+  name: string | null | undefined,
+  order: string[]
+): string {
   if (!name) return "?";
-  const i = PLAN_NAMES.indexOf(name);
+  const i = order.indexOf(name);
   return i >= 0 ? String.fromCharCode(65 + i) : "A";
 }
 
@@ -60,6 +64,7 @@ export default function WorkoutTab() {
   const [autoPlan, setAutoPlan] = useState<TemplateWithCount | null>(null);
   const [templates, setTemplates] = useState<TemplateWithCount[]>([]);
   const [chosenName, setChosenName] = useState<string | null>(null);
+  const [rotationOrder, setRotationOrder] = useState<string[]>(PLAN_NAMES);
   const [unfinished, setUnfinished] = useState<
     (Workout & { template_name: string | null }) | null
   >(null);
@@ -69,15 +74,17 @@ export default function WorkoutTab() {
     useCallback(() => {
       let alive = true;
       (async () => {
-        const [next, all, un, hist] = await Promise.all([
+        const [next, all, un, hist, order] = await Promise.all([
           getNextWorkoutPlan(db),
           getAllTemplates(db),
           getUnfinishedWorkout(db),
           getWorkoutHistory(db),
+          getRotationOrder(db),
         ]);
         if (!alive) return;
         setAutoPlan(next ?? null);
         setTemplates(all);
+        setRotationOrder(order);
         setUnfinished(un ?? null);
         setHistory(hist.slice(0, 5));
         setChosenName(null);
@@ -116,16 +123,16 @@ export default function WorkoutTab() {
     });
   };
 
-  const planLetter = nextPlan ? planLetterOf(nextPlan.name) : "A";
+  const planLetter = nextPlan ? planLetterOf(nextPlan.name, rotationOrder) : "A";
 
   // Override state: the displayed plan differs from the alternation default.
   const isOverride =
     !!autoPlan && !!nextPlan && nextPlan.name !== autoPlan.name;
   // Rotation plans in A→B→C order, then the next one to offer as a one-tap
   // switch. Repeated taps cycle through all three (A→B→C→A).
-  const rotationPlans = PLAN_NAMES.map((n) =>
-    templates.find((t) => t.name === n)
-  ).filter((t): t is TemplateWithCount => !!t);
+  const rotationPlans = rotationOrder
+    .map((n) => templates.find((t) => t.name === n))
+    .filter((t): t is TemplateWithCount => !!t);
   const curIdx = rotationPlans.findIndex((t) => t.name === nextPlan?.name);
   const nextInCycle =
     rotationPlans.length > 1 && curIdx >= 0

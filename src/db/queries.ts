@@ -549,10 +549,41 @@ export async function getUnfinishedWorkout(db: SQLite.SQLiteDatabase) {
 // A/B/C plan rotation (3-way cycle)
 // ───────────────────────────────────────────────────────────
 
+// The user-customisable rotation sequence (e.g. B→A→C). Persisted as a JSON
+// array of plan names in user_settings; falls back to the seeded PLAN_NAMES
+// order. Always returns every current plan exactly once: saved names are kept
+// in their saved order (ignoring any that no longer exist), then any plans
+// missing from the saved list are appended so a schema change can't drop one.
+export async function getRotationOrder(
+  db: SQLite.SQLiteDatabase
+): Promise<string[]> {
+  const raw = await getSetting(db, "rotation_order");
+  let saved: string[] = [];
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) saved = parsed.filter((n) => typeof n === "string");
+    } catch {
+      saved = [];
+    }
+  }
+  const valid = saved.filter((n) => PLAN_NAMES.includes(n));
+  const missing = PLAN_NAMES.filter((n) => !valid.includes(n));
+  return [...valid, ...missing];
+}
+
+export async function setRotationOrder(
+  db: SQLite.SQLiteDatabase,
+  order: string[]
+) {
+  await setSetting(db, "rotation_order", JSON.stringify(order));
+}
+
 // 3-way rotation: look at the most recent *finished* workout's template and
-// advance to the next plan in PLAN_NAMES order (A→B→C→A). If the last plan
-// isn't in the rotation (or there's no history), start at the first plan.
+// advance to the next plan in the user's rotation order (e.g. A→B→C→A). If the
+// last plan isn't in the rotation (or there's no history), start at the first.
 export async function getNextWorkoutPlan(db: SQLite.SQLiteDatabase) {
+  const order = await getRotationOrder(db);
   const last = await db.getFirstAsync<{ template_name: string }>(
     `SELECT t.name as template_name
      FROM workouts w
@@ -560,9 +591,8 @@ export async function getNextWorkoutPlan(db: SQLite.SQLiteDatabase) {
      WHERE w.finished_at IS NOT NULL
      ORDER BY w.started_at DESC LIMIT 1`
   );
-  const idx = last ? PLAN_NAMES.indexOf(last.template_name) : -1;
-  const nextName =
-    idx === -1 ? PLAN_NAMES[0] : PLAN_NAMES[(idx + 1) % PLAN_NAMES.length];
+  const idx = last ? order.indexOf(last.template_name) : -1;
+  const nextName = idx === -1 ? order[0] : order[(idx + 1) % order.length];
   return db.getFirstAsync<TemplateWithCount>(
     `SELECT t.*, COUNT(te.id) as exercise_count
      FROM templates t
@@ -1270,7 +1300,8 @@ export async function bulkSkipExercises(
 export type SettingKey =
   | "rest_sound_enabled"
   | "vibration_enabled"
-  | "health_write_enabled";
+  | "health_write_enabled"
+  | "rotation_order";
 
 export async function getSetting(
   db: SQLite.SQLiteDatabase,

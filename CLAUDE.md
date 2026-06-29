@@ -54,7 +54,17 @@ philosophy change, not drift — documented as such.
   A → B → C → A. Derived from the last *finished* session's template, so doing a
   plan again self-corrects the next suggestion. The home next-up card's
   `⇄ Do {plan} instead` override cycles through all three for the current session
-  only (resets on focus). Engine: `getNextWorkoutPlan` over `PLAN_NAMES`.
+  only (resets on focus). Engine: `getNextWorkoutPlan` over the rotation order.
+- **User-orderable rotation (2026-06-29).** The cycle order is no longer fixed to
+  the seeded `PLAN_NAMES` — it's persisted in `user_settings` under key
+  `rotation_order` (JSON array of plan names) and edited via a reorder strip at
+  the top of the Templates tab (up/down arrows, 3 items). `getRotationOrder`
+  returns the saved order filtered to existing plans, with any missing plans
+  appended (so a schema change can't drop one); falls back to `PLAN_NAMES` when
+  unset. `getNextWorkoutPlan`, the home override cycle, and the A/B/C letter all
+  read this order — so **letters follow the rotation** (top of the strip = A).
+  Setters: `setRotationOrder`. The CSV export's workout letter still uses the
+  canonical `PLAN_NAMES` order (stable for analysis, intentionally not reordered).
 - **Variable working-set count per exercise.** Plans mix 2-set and 3-set
   exercises. Set count is **per-plan**, stored in `template_exercises.sets`
   (the same exercise can be 2 sets in one plan and 3 in another — e.g. Single
