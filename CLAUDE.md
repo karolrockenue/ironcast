@@ -568,7 +568,21 @@ verified to match spec.
 
 ## 15. Distribution / App Store status
 
-**Current state (as of 2026-06-13):**
+**Current state (as of 2026-06-29):**
+- **1.07 (build 20)** — BUILT + SUBMITTED via EAS 2026-06-29 (binary uploaded to
+  ASC, processing — `eas submit` succeeded cleanly this time, no CLI hiccup).
+  Ships **user-orderable workout rotation**: a reorder strip at the top of the
+  Templates tab (up/down arrows) lets you set the cycle order (e.g. B→A→C),
+  persisted in `user_settings` key `rotation_order` (JSON). `getNextWorkoutPlan`,
+  the home override cycle, and the A/B/C letter all read the saved order (letters
+  follow rotation, top = A). No schema change (still v12). Committed `403125b`,
+  pushed to `origin/main`. `app.json` version **1.07**. Bumped from 1.06 (not a
+  new 1.06 build) because 1.06 build 19 was already submitted/released in ASC.
+  **Remaining manual ASC steps:** + Version or Platform → **1.07** → "What's New"
+  → attach the processed **build 20** → Add for Review (manual release).
+  Export-compliance auto-resolves on attach.
+- **1.06 (build 19)** — 3-way A/B/C split + drop pill + plank + regression hint
+  (schema v12). Built + submitted 2026-06-27, submitted/released in ASC.
 - **1.05 (build 16)** — BUILT + SUBMITTED via EAS 2026-06-13 (binary uploaded to
   ASC, processing). Ships the **deadlift heavy/technique removal** (schema v11,
   additive migration clearing `special_rules='deadlift_ht'` → NULL) + **mid-workout
