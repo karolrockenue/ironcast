@@ -1,6 +1,6 @@
 # IronCast — Project Blueprint
 
-**Last updated:** 2026-06-27
+**Last updated:** 2026-06-29
 
 IronCast (renamed from IronLog on 2026-04-20; `IronLog` was already on the App
 Store) is a React Native / Expo app for guided strength training. It rotates
@@ -213,7 +213,7 @@ app/
     history.tsx            List of past finished workouts
     progress.tsx           Stats dashboard (rebuilt): stats grid + all-time PRs + current weights
   templates/
-    index.tsx              Template list (read-mostly "View Plan")
+    index.tsx              Template list + rotation-order reorder strip (up/down arrows)
     [id].tsx               Template editor: exercise rows with sets / reps / rest / per-arm labels
   workout/
     active.tsx             Guided session screen — V7 layout, active/done/pending cards
@@ -397,7 +397,8 @@ Derived state on first launch:
 - [x] History tab listing all finished workouts
 
 ### Smart behaviour
-- [x] **3-way rotation** (A→B→C→A) from last *finished* session's template (`getNextWorkoutPlan` over `PLAN_NAMES`)
+- [x] **3-way rotation** (A→B→C→A) from last *finished* session's template (`getNextWorkoutPlan` over the saved rotation order)
+- [x] **User-orderable rotation (1.07)** — reorder strip at the top of the Templates tab (up/down arrows) sets the cycle order (e.g. B→A→C), persisted in `user_settings` key `rotation_order` (JSON via `getRotationOrder` / `setRotationOrder`). `getNextWorkoutPlan`, the home override cycle, and the A/B/C letter read it (letters follow rotation, top = A). No schema change. CSV export letter stays on canonical `PLAN_NAMES` order.
 - [x] **Override rotation for today** — `⇄ Do {plan} instead` on the home next-up card cycles through all three plans for the current session only. Per-visit (resets on tab focus), shows a "normally {plan}" note when overriding. No persistence — rotation self-corrects from the next *finished* session.
 - [x] **Variable per-plan set counts** (`template_exercises.sets`) — a 3-set exercise renders/logs 3 working sets; progression still reads Set 1
 - [x] **Drop-set pill** (yellow `DROP SET`) on flagged exercises — reminder only, not logged
@@ -538,6 +539,7 @@ tool; Tier 3 = nice; Skip = don't build.
 | `logo.html` | 5 logo lockups (stacked / horizontal / plate+wordmark / stamp / IC monogram) | Stacked Brutalist is the primary lockup (splash) |
 | `appstore-screens.html` | 6 App Store screens at 1242×2688 (splash / home / active / rest / summary / progress) | Exported PNGs at `screenshots/*.png` via headless Chrome and used directly in App Store Connect. Render script: `render` shown in §16 |
 | `dropset.html` | 3 phone screens for the 1.04 drop-set UX (convert a set → log the ladder → logged/collapsed + history) + data-model spec | Approved; shipped as the `DropLadder` UI. Note: final impl adds drops *after* logging the top set (persist-per-stage, auto rest mgmt) rather than the pre-log ladder shown in the mockup — same visual result |
+| `rotation-order.html` | Templates-tab reorder strip for the 1.07 user-orderable rotation (A/B/C badges + up/down arrows + cycle hint) | Approved as-is; shipped into `app/templates/index.tsx` |
 
 ---
 
@@ -770,7 +772,29 @@ Render with headless Chrome into `assets/icon.png` (and copy to
 
 ## 17. Next session — pick up here
 
-**1.06 (build 19) — BUILT + SUBMITTED 2026-06-27.** 3-way split + drop pill +
+**1.07 (build 20) — BUILT + SUBMITTED 2026-06-29.** User-orderable workout
+rotation. Committed `403125b`, pushed to `origin/main`, schema unchanged (**v12**),
+`app.json` version **1.07**. EAS build (build 20) + `eas submit` both succeeded
+cleanly (no CLI hiccup this time); binary uploaded to ASC and processing.
+**Remaining manual ASC steps:** + Version or Platform → **1.07** → "What's New" →
+attach the processed **build 20** → Add for Review (manual release).
+Export-compliance auto-resolves on attach.
+- **User-orderable rotation.** Reorder strip at the top of the Templates tab
+  (up/down arrows) sets the cycle order (e.g. B→A→C), persisted in `user_settings`
+  key `rotation_order` (JSON). `getNextWorkoutPlan`, the home override cycle, and
+  the A/B/C letter all read it (letters follow rotation, top = A). No schema
+  change. See §2/§10. Mockup: `mockups/rotation-order.html`.
+- Files touched: `src/db/queries.ts` (`getRotationOrder`/`setRotationOrder`,
+  `rotation_order` SettingKey, `getNextWorkoutPlan` repointed),
+  `app/(tabs)/index.tsx` (letter + cycle read saved order),
+  `app/templates/index.tsx` (reorder strip), `CLAUDE.md`. `tsc` clean.
+- Known minor (carried from 1.06): Progress-tab "Current Weights" still shows
+  Plank as `0 kg` (not time-formatted there).
+
+---
+
+**1.06 (build 19) — BUILT + SUBMITTED 2026-06-27, submitted/released in ASC.**
+3-way split + drop pill +
 plank + regression hint. Committed `4bf722f`, pushed to `origin/main`, schema
 **v12**, `app.json` version **1.06**. EAS build succeeded (build 19); EAS submit
 CLI showed a generic "Something went wrong" but the binary reached App Store
